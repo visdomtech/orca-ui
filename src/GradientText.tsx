@@ -1,12 +1,13 @@
 import Box from "@mui/material/Box";
 import type { ElementType, ReactNode } from "react";
 
-/** Chrome text gradient sweep for display headlines.
- *  Renders text with a metallic silver gradient using background-clip: text.
+/** Specular chrome text gradient sweep for display headlines.
+ *  Renders text with a multi-stop metallic silver gradient using background-clip: text.
+ *  The gradient includes a bright specular highlight at the center for a striking metallic effect.
  *  Use sparingly on display headlines (h1-h2) - body text stays solid. */
 export interface GradientTextProps {
   children: ReactNode;
-  /** CSS gradient string. Defaults to a chrome silver sweep. */
+  /** CSS gradient string. Defaults to a multi-stop specular chrome sweep. */
   gradient?: string;
   /** HTML element or MUI variant to render. Defaults to "span". */
   component?: ElementType;
@@ -15,7 +16,7 @@ export interface GradientTextProps {
 }
 
 const DEFAULT_GRADIENT =
-  "linear-gradient(135deg, #1e293b 0%, #64748b 50%, #94a3b8 100%)";
+  "linear-gradient(135deg, #1e293b 0%, #475569 20%, #94a3b8 40%, #e2e8f0 50%, #94a3b8 60%, #475569 80%, #1e293b 100%)";
 
 export function GradientText({
   children,
