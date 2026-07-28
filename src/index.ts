@@ -1,5 +1,7 @@
 export { AdminTable } from "./AdminTable";
 export type { AdminTableColumn, AdminTableProps } from "./AdminTable";
+export { AmbientBackground } from "./AmbientBackground";
+export type { AmbientBackgroundProps } from "./AmbientBackground";
 export { DetailLayout } from "./DetailLayout";
 export type { DetailLayoutProps } from "./DetailLayout";
 export { DetailRow } from "./DetailRow";
@@ -10,6 +12,10 @@ export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps } from "./EmptyState";
 export { FormSection } from "./FormSection";
 export type { FormSectionProps } from "./FormSection";
+export { GlassCard } from "./GlassCard";
+export type { GlassCardProps } from "./GlassCard";
+export { GradientText } from "./GradientText";
+export type { GradientTextProps } from "./GradientText";
 export { PageHeader } from "./PageHeader";
 export type { PageHeaderProps } from "./PageHeader";
 export { StatusPill } from "./StatusPill";
