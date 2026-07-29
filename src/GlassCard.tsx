@@ -29,13 +29,13 @@ export function GlassCard({
       sx={{
         p: padding,
         borderRadius,
-        bgcolor: "rgba(255,255,255,0.45)",
+        bgcolor: "var(--lm-glass-bg, rgba(255,255,255,0.45))",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
         border: "1px solid",
-        borderColor: "rgba(255,255,255,0.6)",
+        borderColor: "var(--lm-glass-border, rgba(255,255,255,0.6))",
         boxShadow:
-          "inset 0 1px 0 rgba(255,255,255,0.8), 0 8px 32px -4px rgba(15,23,42,0.08), 0 2px 8px -2px rgba(91,108,255,0.06)",
+          "var(--lm-glass-shadow, inset 0 1px 0 rgba(255,255,255,0.8), 0 8px 32px -4px rgba(15,23,42,0.08), 0 2px 8px -2px rgba(91,108,255,0.06))",
         position: "relative",
         overflow: "hidden",
         transition: "transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease",
