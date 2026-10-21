@@ -29,3 +29,5 @@ jobs:
       run: bun run build
     - name: Publish
       run: bun publish --access public
+      env:
+        NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
