@@ -22,3 +22,5 @@ export { StatusPill } from "./StatusPill";
 export type { StatusPillProps, StatusPillTone } from "./StatusPill";
 export { TableSkeleton } from "./TableSkeleton";
 export type { TableSkeletonProps } from "./TableSkeleton";
+export { UserChip } from "./UserChip";
+export type { UserChipProps } from "./UserChip";
