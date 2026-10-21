@@ -755,6 +755,9 @@ function UsersPane({
   const [filterLocation, setFilterLocation] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [lastFilterKey, setLastFilterKey] = useState(
+    () => [query, filterRole, filterGroup, filterFamily, filterLocation].join("\0")
+  );
   const [bulkRole, setBulkRole] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
@@ -834,7 +837,11 @@ function UsersPane({
     });
   }, [ordered, query, filterRole, filterGroup, filterFamily, filterLocation, employeeMap]);
 
-  useEffect(() => setPage(1), [query, filterRole, filterGroup, filterFamily, filterLocation]);
+  const filterKey = [query, filterRole, filterGroup, filterFamily, filterLocation].join("\0");
+  if (filterKey !== lastFilterKey) {
+    setLastFilterKey(filterKey);
+    setPage(1);
+  }
 
   const selectable = useMemo(
     () => filtered.filter((a) => a.userEmail.toLowerCase() !== currentUserEmail.toLowerCase()),
@@ -845,16 +852,14 @@ function UsersPane({
   const pageSafe = Math.min(page, totalPages);
   const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
-  const allSelected = selectable.length > 0 && selected.size === selectable.length;
-  const someSelected = selected.size > 0 && !allSelected;
-
-  useEffect(() => {
+  const validSelected = useMemo(() => {
     const visible = new Set(selectable.map((a) => a.userEmail));
-    setSelected((prev) => {
-      const next = new Set([...prev].filter((id) => visible.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [selectable]);
+    const next = new Set([...selected].filter((id) => visible.has(id)));
+    return next.size === selected.size ? selected : next;
+  }, [selectable, selected]);
+
+  const allSelected = selectable.length > 0 && validSelected.size === selectable.length;
+  const someSelected = validSelected.size > 0 && !allSelected;
 
   const toggle = (email: string) =>
     setSelected((prev) => {
@@ -867,7 +872,7 @@ function UsersPane({
   const toggleAll = () =>
     setSelected(allSelected ? new Set() : new Set(selectable.map((a) => a.userEmail)));
 
-  const selectedAssignments = selectable.filter((a) => selected.has(a.userEmail));
+  const selectedAssignments = selectable.filter((a) => validSelected.has(a.userEmail));
   const toChange = bulkRole ? selectedAssignments.filter((a) => a.roleCode !== bulkRole) : [];
   const pending = setRole.isPending;
   const closeConfirm = useCallback(() => { if (!pending) setConfirming(false); }, [pending]);
@@ -970,12 +975,12 @@ function UsersPane({
         </span>
       </div>
 
-      {selected.size > 0 && (
+      {validSelected.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm">
           <span className="font-medium text-slate-800">
             {allSelected && selectable.length > PAGE_SIZE
-              ? `All ${selected.size} ${filtersOn ? "matching " : ""}people selected`
-              : `${selected.size} selected`}
+              ? `All ${validSelected.size} ${filtersOn ? "matching " : ""}people selected`
+              : `${validSelected.size} selected`}
           </span>
           <span className="text-slate-300">|</span>
           <label className="flex items-center gap-2 text-slate-600">
@@ -1004,7 +1009,7 @@ function UsersPane({
           <PrimaryButton
             onClick={() => setConfirming(true)}
             disabled={!bulkRole || toChange.length === 0 || setRole.isPending}>
-            {bulkRole && toChange.length === 0 ? "Already assigned" : `Apply to ${bulkRole ? toChange.length : selected.size}`}
+            {bulkRole && toChange.length === 0 ? "Already assigned" : `Apply to ${bulkRole ? toChange.length : validSelected.size}`}
           </PrimaryButton>
           <button type="button" onClick={() => setSelected(new Set())}
             className="ml-auto text-xs font-medium text-slate-500 hover:text-slate-700 hover:underline">
@@ -1013,7 +1018,7 @@ function UsersPane({
         </div>
       )}
 
-      {notice && selected.size === 0 && (
+      {notice && validSelected.size === 0 && (
         <div className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-200">
           <span>{notice}</span>
           <button type="button" onClick={() => setNotice(undefined)} aria-label="Dismiss"
@@ -1035,7 +1040,7 @@ function UsersPane({
         ]}>
           {paged.map(({ userEmail, roleCode }) => {
             const isMe = userEmail.toLowerCase() === currentUserEmail.toLowerCase();
-            const isSelected = selected.has(userEmail);
+            const isSelected = validSelected.has(userEmail);
             const emp = employeeMap.get(userEmail.toLowerCase());
             const initials = emp ? (() => {
               const words = emp.name.trim().split(/\s+/);
