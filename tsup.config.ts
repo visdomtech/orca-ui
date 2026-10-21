@@ -14,6 +14,7 @@ export default defineConfig({
     "@mui/system",
     "@emotion/react",
     "@emotion/styled",
+    "@tanstack/react-query",
   ],
   sourcemap: true,
   clean: true,

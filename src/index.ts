@@ -24,3 +24,14 @@ export { TableSkeleton } from "./TableSkeleton";
 export type { TableSkeletonProps } from "./TableSkeleton";
 export { UserChip } from "./UserChip";
 export type { UserChipProps } from "./UserChip";
+export { UsersAccess } from "./UsersAccess";
+export type {
+  UsersAccessProps,
+  HttpClient,
+  AuditSubject,
+  AuditCriteria,
+  RoleAuditConcern,
+  RoleAuditResult,
+  RoleAuditFinding,
+} from "./UsersAccess";
+export { buildRoleAuditPrompt, parseRoleAuditResult } from "./UsersAccess";
