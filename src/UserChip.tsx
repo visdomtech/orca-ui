@@ -6,6 +6,7 @@ import type { SxProps, Theme } from "@mui/material/styles";
 export interface UserChipProps {
   name: string;
   title?: string;
+  avatarUrl?: string;
   size?: "sm" | "md" | "lg";
   sx?: SxProps<Theme>;
 }
@@ -19,8 +20,8 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function UserChip({ name, title, size = "md", sx }: UserChipProps) {
-  const px = AVATAR_SIZE[size];
+export function UserChip({ name, title, avatarUrl, size = "md", sx }: UserChipProps) {
+  const avatarSize = AVATAR_SIZE[size];
   return (
     <Box
       sx={[
@@ -29,16 +30,18 @@ export function UserChip({ name, title, size = "md", sx }: UserChipProps) {
       ]}
     >
       <Avatar
+        src={avatarUrl}
+        aria-label={name}
         sx={{
-          width: px,
-          height: px,
-          fontSize: px * 0.38,
+          width: avatarSize,
+          height: avatarSize,
+          fontSize: avatarSize * 0.38,
           fontWeight: 600,
           bgcolor: "primary.main",
           flexShrink: 0,
         }}
       >
-        {initials(name)}
+        <span aria-hidden="true">{initials(name)}</span>
       </Avatar>
       <Box sx={{ minWidth: 0 }}>
         <Typography
@@ -50,7 +53,7 @@ export function UserChip({ name, title, size = "md", sx }: UserChipProps) {
         </Typography>
         {title ? (
           <Typography
-            variant="caption"
+            variant={size === "lg" ? "body2" : "caption"}
             sx={{ color: "text.secondary", lineHeight: 1.3, display: "block" }}
             noWrap
           >
