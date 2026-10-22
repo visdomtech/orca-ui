@@ -5,6 +5,7 @@ export function sanitizeProfileField(raw: string, maxLen = 100): string {
     .replace(/[\r\n\t]/g, " ")
     .replace(/[|｜¦∣∥]/g, "/")
     .replace(/["'`]/g, "'")
+    .replace(/<<<|>>>/g, "")
     .trim()
     .slice(0, maxLen);
 }
@@ -252,7 +253,7 @@ export function buildRoleAuditPrompt(
   ];
   const concernEnum = validConcernTypes.length > 0
     ? validConcernTypes.join("|")
-    : "<concern type>";
+    : "OVER_PRIVILEGED|UNDER_PRIVILEGED|UNUSUAL_FOR_TITLE";
 
   lines.push(
     `Valid role codes: ${validRoles}, or NONE for no access.`,

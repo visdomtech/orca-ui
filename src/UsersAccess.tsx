@@ -3,6 +3,8 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -22,6 +24,7 @@ import {
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
+/** HTTP client adapter. All methods must reject (throw) on non-2xx responses. */
 export interface HttpClient {
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body?: unknown): Promise<T>;
@@ -58,12 +61,9 @@ export interface UsersAccessProps {
     criteria: AuditCriteria,
     signal?: AbortSignal
   ) => Promise<RoleAuditResult>;
+  /** Open a specific tab on mount. Defaults to "users". */
+  initialPane?: "users" | "matrix" | "history" | "audit";
 }
-
-// ── Re-exports for callers building auditRoles ────────────────────────────────
-
-export type { AuditSubject, AuditCriteria, RoleAuditConcern, RoleAuditResult, RoleAuditFinding } from "./roleAuditPrompt";
-export { buildRoleAuditPrompt, parseRoleAuditResult } from "./roleAuditPrompt";
 
 // ── Internal context ──────────────────────────────────────────────────────────
 
@@ -228,10 +228,11 @@ function useResetCapabilityRoles(onChanged?: () => void) {
 }
 
 function useHrRoles() {
-  const { httpClient } = useCtx();
+  const { appId, httpClient } = useCtx();
   return useQuery<HrRole[]>({
     queryKey: keys.hrRoles(),
     queryFn: () => httpClient.get("/orcaagents/hrglobalroles/roles"),
+    enabled: !!appId,
     staleTime: 5 * 60_000,
   });
 }
@@ -242,6 +243,7 @@ async function fetchAllEmployees(httpClient: HttpClient): Promise<Employee[]> {
   );
   if (!first?.items) return [];
   const all = [...first.items];
+  // Cap at 50 pages (5,000 employees) to bound latency and memory usage.
   const totalPages = Math.min(Math.ceil(first.totalCount / 100), 50);
   if (totalPages <= 1) return all;
   for (let p = 2; p <= totalPages; p++) {
@@ -304,8 +306,8 @@ function Avatar({ name, label, size = 32 }: { name: string; label?: string; size
 
 function useModalA11y(onClose: () => void) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => { closeButtonRef.current?.focus(); }, []);
   useEffect(() => {
-    closeButtonRef.current?.focus();
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
@@ -317,12 +319,13 @@ function Modal({ title, onClose, children, footer }: {
   title: string; onClose: () => void; children: ReactNode; footer?: ReactNode;
 }) {
   const closeButtonRef = useModalA11y(onClose);
+  const titleId = useId();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <div role="dialog" aria-modal="true" aria-label={title}
+      <div role="dialog" aria-modal="true" aria-labelledby={titleId}
         className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-          <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+          <h3 id={titleId} className="text-sm font-semibold text-slate-800">{title}</h3>
           <button ref={closeButtonRef} type="button" onClick={onClose} aria-label="Close"
             className="text-slate-400 hover:text-slate-600">✕</button>
         </div>
@@ -342,7 +345,7 @@ function DataTable({ headers, children }: { headers: ReactNode[]; children: Reac
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50 text-left">
             {headers.map((header, i) => (
-              <th key={i} className="px-1.5 py-2 align-bottom text-[11px] font-semibold leading-tight text-slate-500">
+              <th key={i} scope="col" className="px-1.5 py-2 align-bottom text-[11px] font-semibold leading-tight text-slate-500">
                 {header}
               </th>
             ))}
@@ -499,6 +502,7 @@ export function UsersAccess({
   httpClient,
   currentUserEmail,
   auditRoles,
+  initialPane,
 }: UsersAccessProps) {
   return (
     <UsersAccessCtx.Provider value={{ appId, httpClient, currentUserEmail, auditRoles }}>
@@ -506,6 +510,7 @@ export function UsersAccess({
         roles={roles}
         capabilities={capabilities}
         onCapabilityRolesChanged={onCapabilityRolesChanged}
+        initialPane={initialPane}
       />
     </UsersAccessCtx.Provider>
   );
@@ -515,15 +520,17 @@ function UsersAccessInner({
   roles,
   capabilities,
   onCapabilityRolesChanged,
+  initialPane,
 }: {
   roles: UsersAccessProps["roles"];
   capabilities: UsersAccessProps["capabilities"];
   onCapabilityRolesChanged?: () => void;
+  initialPane?: UsersAccessProps["initialPane"];
 }) {
   const { appId, httpClient, auditRoles } = useCtx();
-  const [pane, setPane] = useState<Pane>("users");
-  const { data: assignments = [] } = useUserRoles();
-  const { data: allWorkspaceEmployees = [], isLoading: isLoadingEmployees } = useAllEmployees();
+  const [pane, setPane] = useState<Pane>(initialPane ?? "users");
+  const { data: assignments = [], isError: rolesError } = useUserRoles();
+  const { data: allWorkspaceEmployees = [], isLoading: isLoadingEmployees, isError: employeesError } = useAllEmployees();
 
   const mergedAssignments = useMemo(() => {
     const seen = new Map(assignments.map((a) => [a.userEmail.toLowerCase(), a]));
@@ -611,7 +618,7 @@ function UsersAccessInner({
 
   const [auditSubjectCount, setAuditSubjectCount] = useState<number | undefined>();
 
-  async function runAudit(criteria: AuditCriteria): Promise<RoleAuditResult> {
+  const runAudit = useCallback(async (criteria: AuditCriteria): Promise<RoleAuditResult | undefined> => {
     if (!auditRoles) throw new Error("auditRoles not provided");
     auditAbortRef.current?.abort();
     const controller = new AbortController();
@@ -640,7 +647,6 @@ function UsersAccessInner({
         }
         setAuditError(msg);
       }
-      throw err;
     } finally {
       clearTimeout(timeoutId);
       auditTimeoutRef.current = undefined;
@@ -648,7 +654,7 @@ function UsersAccessInner({
         setAuditPending(false);
       }
     }
-  }
+  }, [auditRoles, subjects, roles]);
 
   const historyUserRoles = useQuery<AuditListResult>({
     queryKey: keys.auditHistory("app_user_role", appId),
@@ -666,6 +672,7 @@ function UsersAccessInner({
 
   const showMatrix = capabilities !== undefined && capabilities.length > 0;
   const showAudit = auditRoles !== undefined;
+  const rosterTruncated = allWorkspaceEmployees.length >= 5000;
 
   const shown: Pane =
     pane === "matrix" && !showMatrix ? "users"
@@ -675,6 +682,11 @@ function UsersAccessInner({
   return (
     <div className="space-y-5">
       <SectionTitle hint={summary}>Users & Access</SectionTitle>
+      {rosterTruncated && (
+        <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-inset ring-amber-200">
+          Showing the first 5,000 employees. Your full roster is larger — some users may not appear.
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="grid lg:grid-cols-[200px_minmax(0,1fr)]">
@@ -700,7 +712,7 @@ function UsersAccessInner({
 
           <div className="min-w-0 p-4">
             {shown === "users" && (
-              <UsersPane roles={roles} assignments={mergedAssignments} />
+              <UsersPane roles={roles} assignments={mergedAssignments} isError={rolesError || employeesError} />
             )}
             {shown === "matrix" && showMatrix && (
               <MatrixPane
@@ -737,9 +749,11 @@ function UsersAccessInner({
 function UsersPane({
   roles,
   assignments,
+  isError,
 }: {
   roles: { code: string; label: string }[];
   assignments: UserAppRole[];
+  isError: boolean;
 }) {
   const { currentUserEmail } = useCtx();
   const setRole = useSetUserRole();
@@ -760,6 +774,7 @@ function UsersPane({
   );
   const [bulkRole, setBulkRole] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [bulkPending, setBulkPending] = useState(false);
   const [notice, setNotice] = useState<string | undefined>();
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -854,8 +869,7 @@ function UsersPane({
 
   const validSelected = useMemo(() => {
     const visible = new Set(selectable.map((a) => a.userEmail));
-    const next = new Set([...selected].filter((id) => visible.has(id)));
-    return next.size === selected.size ? selected : next;
+    return new Set([...selected].filter((id) => visible.has(id)));
   }, [selectable, selected]);
 
   const allSelected = selectable.length > 0 && validSelected.size === selectable.length;
@@ -874,8 +888,7 @@ function UsersPane({
 
   const selectedAssignments = selectable.filter((a) => validSelected.has(a.userEmail));
   const toChange = bulkRole ? selectedAssignments.filter((a) => a.roleCode !== bulkRole) : [];
-  const pending = setRole.isPending;
-  const closeConfirm = useCallback(() => { if (!pending) setConfirming(false); }, [pending]);
+  const closeConfirm = useCallback(() => { if (!bulkPending) setConfirming(false); }, [bulkPending]);
 
   function applyBulk() {
     if (!bulkRole) return;
@@ -886,12 +899,14 @@ function UsersPane({
     const roleLabel = [...hrRoles, ...roles].find((r) => r.code === role)?.label ?? role;
     const results: ("ok" | "error")[] = [];
     const failures: { email: string; err: unknown }[] = [];
+    setBulkPending(true);
     for (const a of snapshot) {
       setRole.mutate({ email: a.userEmail, roleCode: role }, {
         onSuccess: () => { results.push("ok"); },
         onError: (err) => { failures.push({ email: a.userEmail, err }); results.push("error"); },
         onSettled: () => {
           if (results.length === snapshot.length && mountedRef.current) {
+            setBulkPending(false);
             setConfirming(false);
             if (failures.length === 0) {
               setNotice(`${count} ${count === 1 ? "person" : "people"} set to ${roleLabel}.`);
@@ -914,6 +929,12 @@ function UsersPane({
         title="Users"
         hint="Everyone in your workspace. Assign a role to grant access, or set to No Access to remove it."
       />
+
+      {isError && (
+        <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-200">
+          Failed to load users — check your connection and try refreshing.
+        </div>
+      )}
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
@@ -1074,7 +1095,9 @@ function UsersPane({
                   </div>
                 </td>
                 <td className="px-3 py-2">
-                  <select value={roleCode ?? "NONE"} onChange={(e) => setRole.mutate({ email: userEmail, roleCode: e.target.value })}
+                  <select value={roleCode ?? "NONE"} onChange={(e) => setRole.mutate({ email: userEmail, roleCode: e.target.value }, {
+                    onError: () => setNotice("Failed to update role — please try again."),
+                  })}
                     disabled={isMe} aria-label={`Role for ${userEmail}`}
                     className={`${inputClass.replace("w-full", "w-60")} bg-white`}>
                     {hrRoles.length > 0 && (
@@ -1137,9 +1160,9 @@ function UsersPane({
       {confirming && bulkRole && (
         <Modal title="Assign role" onClose={closeConfirm} footer={
           <>
-            <SecondaryButton onClick={() => setConfirming(false)} disabled={setRole.isPending}>Cancel</SecondaryButton>
-            <PrimaryButton onClick={applyBulk} disabled={setRole.isPending || toChange.length === 0}>
-              {setRole.isPending ? "Assigning…" : `Set ${toChange.length} ${toChange.length === 1 ? "person" : "people"}`}
+            <SecondaryButton onClick={() => setConfirming(false)} disabled={bulkPending}>Cancel</SecondaryButton>
+            <PrimaryButton onClick={applyBulk} disabled={bulkPending || toChange.length === 0}>
+              {bulkPending ? "Assigning…" : `Set ${toChange.length} ${toChange.length === 1 ? "person" : "people"}`}
             </PrimaryButton>
           </>
         }>
@@ -1201,7 +1224,9 @@ function MatrixPane({
   const createCustomRole = useCreateCustomRole();
   const deleteCustomRole = useDeleteCustomRole();
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmDeleteRole, setConfirmDeleteRole] = useState<string | undefined>();
   const [editing, setEditing] = useState(false);
+  const [batchGranting, setBatchGranting] = useState(false);
   const [addingRole, setAddingRole] = useState(false);
   const [newRoleLabel, setNewRoleLabel] = useState("");
 
@@ -1210,7 +1235,7 @@ function MatrixPane({
   const hrRolesForMatrix = useMemo(() => hrRoles.filter((r) => !appRoleCodes.has(r.code)), [hrRoles, appRoleCodes]);
   const staticGrantingRoles = roles.filter((r) => r.code !== "NONE");
   const grantingRoles = [...hrRolesForMatrix, ...staticGrantingRoles, ...customRoles];
-  const isMutating = grant.isPending || revoke.isPending || reset.isPending || createCustomRole.isPending || deleteCustomRole.isPending;
+  const isMutating = grant.isPending || revoke.isPending || reset.isPending || createCustomRole.isPending || deleteCustomRole.isPending || batchGranting;
   const isCustomized = dbPairs.length > 0;
   const newRoleCode = newRoleLabel.trim().toUpperCase().replace(/\s+/g, "_");
 
@@ -1238,9 +1263,22 @@ function MatrixPane({
       const next = new Set(effective);
       if (isOn) next.delete(roleCode);
       else next.add(roleCode);
-      for (const r of next) grant.mutate({ capabilityCode: cap.code, roleCode: r });
+      const rolesList = [...next];
+      if (rolesList.length === 0) return;
+      let settled = 0;
+      setBatchGranting(true);
+      for (const r of rolesList) {
+        grant.mutate({ capabilityCode: cap.code, roleCode: r }, {
+          onSettled: () => {
+            settled++;
+            if (settled === rolesList.length) setBatchGranting(false);
+          },
+        });
+      }
     }
   }
+
+  const closeConfirmReset = useCallback(() => { if (!reset.isPending) setConfirmReset(false); }, [reset.isPending]);
 
   return (
     <div>
@@ -1280,7 +1318,7 @@ function MatrixPane({
                 <span className="flex items-center justify-center gap-1">
                   <span>{role.label}</span>
                   {isCustom && (
-                    <button type="button" onClick={() => deleteCustomRole.mutate(role.code)}
+                    <button type="button" onClick={() => setConfirmDeleteRole(role.code)}
                       disabled={deleteCustomRole.isPending} aria-label={`Delete role ${role.label}`}
                       title="Delete this role"
                       className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[10px] text-slate-400 hover:bg-red-100 hover:text-red-600 disabled:opacity-40">×</button>
@@ -1343,7 +1381,7 @@ function MatrixPane({
 
       {confirmReset && (
         <Modal title="Reset access matrix"
-          onClose={() => { if (!reset.isPending) setConfirmReset(false); }}
+          onClose={closeConfirmReset}
           footer={
             <>
               <SecondaryButton onClick={() => setConfirmReset(false)} disabled={reset.isPending}>Cancel</SecondaryButton>
@@ -1357,6 +1395,36 @@ function MatrixPane({
           </p>
         </Modal>
       )}
+
+      {confirmDeleteRole && (() => {
+        const roleToDelete = grantingRoles.find((r) => r.code === confirmDeleteRole);
+        const usersWithRole = assignments.filter((a) => a.roleCode === confirmDeleteRole).length;
+        return (
+          <Modal title="Delete custom role"
+            onClose={() => { if (!deleteCustomRole.isPending) setConfirmDeleteRole(undefined); }}
+            footer={
+              <>
+                <SecondaryButton onClick={() => setConfirmDeleteRole(undefined)} disabled={deleteCustomRole.isPending}>Cancel</SecondaryButton>
+                <PrimaryButton
+                  onClick={() => deleteCustomRole.mutate(confirmDeleteRole, { onSuccess: () => setConfirmDeleteRole(undefined) })}
+                  disabled={deleteCustomRole.isPending}>
+                  {deleteCustomRole.isPending ? "Deleting…" : "Delete role"}
+                </PrimaryButton>
+              </>
+            }>
+            <p className="text-sm text-slate-700">
+              Delete <span className="font-semibold">{roleToDelete?.label ?? confirmDeleteRole}</span>?
+              This removes it from the access matrix.
+            </p>
+            {usersWithRole > 0 && (
+              <p className="mt-2 text-xs text-amber-700">
+                {usersWithRole} {usersWithRole === 1 ? "person currently holds" : "people currently hold"} this role.
+                Their role code will be left as-is until reassigned.
+              </p>
+            )}
+          </Modal>
+        );
+      })()}
     </div>
   );
 }
@@ -1385,6 +1453,8 @@ function HistoryPane() {
     return [...merged].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [userRolesQuery.data, customRolesQuery.data, only]);
 
+  const historyError = userRolesQuery.isError || customRolesQuery.isError;
+
   return (
     <div>
       <PaneHeader
@@ -1401,7 +1471,12 @@ function HistoryPane() {
           </div>
         }
       />
-      {entries.length === 0 ? (
+      {historyError && (
+        <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-inset ring-red-200">
+          Failed to load history — check your connection and try refreshing.
+        </div>
+      )}
+      {entries.length === 0 && !historyError ? (
         <Empty title="No changes recorded yet" hint="Role changes made in this app appear here." />
       ) : (
         <DataTable headers={["When", "Who", "Action", "Detail"]}>
@@ -1500,7 +1575,7 @@ function AuditPane({
   result: RoleAuditResult | undefined;
   onResult: (r: RoleAuditResult | undefined) => void;
   onClearAuditCount: () => void;
-  onRun: (criteria: AuditCriteria) => Promise<RoleAuditResult>;
+  onRun: (criteria: AuditCriteria) => Promise<RoleAuditResult | undefined>;
   isPending: boolean;
   error: string | undefined;
   isLoadingEmployees: boolean;
@@ -1561,6 +1636,7 @@ function AuditPane({
                   <button key={opt.key} type="button" role="checkbox" aria-checked={on}
                     disabled={isPending}
                     onClick={() => setCriteria((c) => ({ ...c, [opt.key]: !c[opt.key] }))}
+                    onKeyDown={(e) => { if (e.key === " ") { e.preventDefault(); setCriteria((c) => ({ ...c, [opt.key]: !c[opt.key] })); } }}
                     className={`relative flex flex-col items-start rounded-lg border p-3.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                       on ? "border-indigo-300 bg-indigo-50/60 ring-1 ring-inset ring-indigo-200"
                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"

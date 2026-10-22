@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./role-audit-prompt": {
+      "types": "./dist/roleAuditPrompt.d.ts",
+      "import": "./dist/roleAuditPrompt.js"
     }
   },
   "files": [
@@ -32,9 +36,6 @@
   },
   "peerDependenciesMeta": {
     "react-router": {
-      "optional": true
-    },
-    "@tanstack/react-query": {
       "optional": true
     }
   },
