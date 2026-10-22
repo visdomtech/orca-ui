@@ -237,27 +237,28 @@ function useHrRoles() {
   });
 }
 
-async function fetchAllEmployees(httpClient: HttpClient): Promise<Employee[]> {
+async function fetchAllEmployees(httpClient: HttpClient): Promise<{ items: Employee[]; truncated: boolean }> {
   const first = await httpClient.get<EmployeeListResult>(
     "/orcaagents/headcount/employees?page=1&pageSize=100"
   );
-  if (!first?.items) return [];
+  if (!first?.items) return { items: [], truncated: false };
   const all = [...first.items];
   // Cap at 50 pages (5,000 employees) to bound latency and memory usage.
   const totalPages = Math.min(Math.ceil(first.totalCount / 100), 50);
-  if (totalPages <= 1) return all;
+  const truncated = first.totalCount > 5000;
+  if (totalPages <= 1) return { items: all, truncated };
   for (let p = 2; p <= totalPages; p++) {
     const page = await httpClient.get<EmployeeListResult>(
       `/orcaagents/headcount/employees?page=${p}&pageSize=100`
     );
     if (page?.items) all.push(...page.items);
   }
-  return all;
+  return { items: all, truncated };
 }
 
 function useAllEmployees() {
   const { httpClient } = useCtx();
-  return useQuery<Employee[]>({
+  return useQuery<{ items: Employee[]; truncated: boolean }>({
     queryKey: keys.employees(),
     queryFn: () => fetchAllEmployees(httpClient),
     staleTime: 5 * 60_000,
@@ -530,7 +531,8 @@ function UsersAccessInner({
   const { appId, httpClient, auditRoles } = useCtx();
   const [pane, setPane] = useState<Pane>(initialPane ?? "users");
   const { data: assignments = [], isError: rolesError } = useUserRoles();
-  const { data: allWorkspaceEmployees = [], isLoading: isLoadingEmployees, isError: employeesError } = useAllEmployees();
+  const { data: allEmployeesData, isLoading: isLoadingEmployees, isError: employeesError } = useAllEmployees();
+  const allWorkspaceEmployees = useMemo<Employee[]>(() => allEmployeesData?.items ?? [], [allEmployeesData]);
 
   const mergedAssignments = useMemo(() => {
     const seen = new Map(assignments.map((a) => [a.userEmail.toLowerCase(), a]));
@@ -672,7 +674,7 @@ function UsersAccessInner({
 
   const showMatrix = capabilities !== undefined && capabilities.length > 0;
   const showAudit = auditRoles !== undefined;
-  const rosterTruncated = allWorkspaceEmployees.length >= 5000;
+  const rosterTruncated = allEmployeesData?.truncated ?? false;
 
   const shown: Pane =
     pane === "matrix" && !showMatrix ? "users"
@@ -760,7 +762,8 @@ function UsersPane({
   const removeRole = useRemoveUserRole();
   const { data: hrRoles = [] } = useHrRoles();
   const { data: customRoles = [] } = useCustomRoles();
-  const { data: allEmployees = [], isLoading: empLoading } = useAllEmployees();
+  const { data: allEmployeesRaw, isLoading: empLoading } = useAllEmployees();
+  const allEmployees = useMemo<Employee[]>(() => allEmployeesRaw?.items ?? [], [allEmployeesRaw]);
 
   const [query, setQuery] = useState("");
   const [filterRole, setFilterRole] = useState("");
@@ -1279,6 +1282,7 @@ function MatrixPane({
   }
 
   const closeConfirmReset = useCallback(() => { if (!reset.isPending) setConfirmReset(false); }, [reset.isPending]);
+  const closeConfirmDeleteRole = useCallback(() => { if (!deleteCustomRole.isPending) setConfirmDeleteRole(undefined); }, [deleteCustomRole.isPending]);
 
   return (
     <div>
@@ -1401,7 +1405,7 @@ function MatrixPane({
         const usersWithRole = assignments.filter((a) => a.roleCode === confirmDeleteRole).length;
         return (
           <Modal title="Delete custom role"
-            onClose={() => { if (!deleteCustomRole.isPending) setConfirmDeleteRole(undefined); }}
+            onClose={closeConfirmDeleteRole}
             footer={
               <>
                 <SecondaryButton onClick={() => setConfirmDeleteRole(undefined)} disabled={deleteCustomRole.isPending}>Cancel</SecondaryButton>
@@ -1476,9 +1480,10 @@ function HistoryPane() {
           Failed to load history — check your connection and try refreshing.
         </div>
       )}
-      {entries.length === 0 && !historyError ? (
+      {entries.length === 0 && !historyError && (
         <Empty title="No changes recorded yet" hint="Role changes made in this app appear here." />
-      ) : (
+      )}
+      {entries.length > 0 && (
         <DataTable headers={["When", "Who", "Action", "Detail"]}>
           {entries.slice(0, 100).map((entry) => (
             <tr key={entry.auditId} className="hover:bg-slate-50">
