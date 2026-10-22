@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/visdomtech/orca-ui/compare/v1.0.4...v1.1.0) (2026-10-22)
+
+
+### Features
+
+* add UsersAccess component with role management, audit, and auto-injected Tailwind styles ([6a11b1f](https://github.com/visdomtech/orca-ui/commit/6a11b1f8bd460498a56ba668940db3e453037f88))
+
 ## [1.0.4](https://github.com/visdomtech/orca-ui/compare/v1.0.3...v1.0.4) (2026-10-22)
 
 
