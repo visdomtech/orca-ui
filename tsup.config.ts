@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.ts"],
+  entry: ["src/index.ts", "src/roleAuditPrompt.ts"],
   format: ["esm"],
   dts: true,
   treeshake: true,
@@ -14,7 +14,9 @@ export default defineConfig({
     "@mui/system",
     "@emotion/react",
     "@emotion/styled",
+    "@tanstack/react-query",
   ],
+  injectStyle: true,
   sourcemap: true,
   clean: true,
 });

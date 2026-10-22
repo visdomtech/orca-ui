@@ -1,3 +1,4 @@
+import "./_compiled.css";
 export { AdminTable } from "./AdminTable";
 export type { AdminTableColumn, AdminTableProps } from "./AdminTable";
 export { AmbientBackground } from "./AmbientBackground";
@@ -24,3 +25,18 @@ export { TableSkeleton } from "./TableSkeleton";
 export type { TableSkeletonProps } from "./TableSkeleton";
 export { UserChip } from "./UserChip";
 export type { UserChipProps } from "./UserChip";
+export { UsersAccess } from "./UsersAccess";
+export type { UsersAccessProps, HttpClient } from "./UsersAccess";
+export type {
+  AuditSubject,
+  AuditCriteria,
+  RoleAuditConcern,
+  RoleAuditResult,
+  RoleAuditFinding,
+} from "./roleAuditPrompt";
+export {
+  buildRoleAuditPrompt,
+  parseRoleAuditResult,
+  DEFAULT_AUDIT_CRITERIA,
+  CONCERN_VALUES,
+} from "./roleAuditPrompt";
