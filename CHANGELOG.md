@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/visdomtech/orca-ui/compare/v1.0.1...v1.0.2) (2026-10-22)
+
+
+### Bug Fixes
+
+* upgrade node version to support trusted publisher ([f441632](https://github.com/visdomtech/orca-ui/commit/f4416321e1c98d241714b046d28d6cc69ee4c248))
+
 ## [1.0.1](https://github.com/visdomtech/orca-ui/compare/v1.0.0...v1.0.1) (2026-10-22)
 
 
