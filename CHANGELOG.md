@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1](https://github.com/visdomtech/orca-ui/compare/v1.0.0...v1.0.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* Release-As: 1.0.1 ([4a4fcc3](https://github.com/visdomtech/orca-ui/commit/4a4fcc38db3705533ab5d5a283849b73b3edb4ac))
+* use secret RELEASE_PAT ([e3112e0](https://github.com/visdomtech/orca-ui/commit/e3112e0c43a372b619c3981165acefa9d2d27ecb))
+
 ## 1.0.0 (2026-10-22)
 
 
