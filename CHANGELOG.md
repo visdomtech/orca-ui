@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/visdomtech/orca-ui/compare/v1.1.0...v1.1.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* restore *.css in sideEffects so esbuild includes CSS injection ([26529b1](https://github.com/visdomtech/orca-ui/commit/26529b12328e76d7bc59039124d36d287b5b7c3f))
+
 ## [1.1.0](https://github.com/visdomtech/orca-ui/compare/v1.0.4...v1.1.0) (2026-10-22)
 
 
