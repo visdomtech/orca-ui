@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.4](https://github.com/visdomtech/orca-ui/compare/v1.0.3...v1.0.4) (2026-10-22)
+
+
+### Bug Fixes
+
+* add "github:visdomtech/orca-ui" ([a1329de](https://github.com/visdomtech/orca-ui/commit/a1329de39eee578f7fceef456346bf9ca299e7fc))
+
 ## [1.0.3](https://github.com/visdomtech/orca-ui/compare/v1.0.2...v1.0.3) (2026-10-22)
 
 
