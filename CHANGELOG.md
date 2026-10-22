@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/visdomtech/orca-ui/compare/v1.0.2...v1.0.3) (2026-10-22)
+
+
+### Bug Fixes
+
+* remove cache to avoid requiring xxx-lock to compute a cache key ([acae7d5](https://github.com/visdomtech/orca-ui/commit/acae7d5281cfdd721fc4b3bdc1f5fe842b04703d))
+
 ## [1.0.2](https://github.com/visdomtech/orca-ui/compare/v1.0.1...v1.0.2) (2026-10-22)
 
 
