@@ -16,6 +16,7 @@ export default defineConfig({
     "@emotion/styled",
     "@tanstack/react-query",
   ],
+  injectStyle: true,
   sourcemap: true,
   clean: true,
 });

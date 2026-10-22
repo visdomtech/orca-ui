@@ -1,3 +1,4 @@
+import "./_compiled.css";
 export { AdminTable } from "./AdminTable";
 export type { AdminTableColumn, AdminTableProps } from "./AdminTable";
 export { AmbientBackground } from "./AmbientBackground";
