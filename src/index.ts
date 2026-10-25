@@ -1,4 +1,6 @@
 import "./_compiled.css";
+export { SubAppHeader } from "./SubAppHeader";
+export type { SubAppHeaderProps, SubAppHeaderTab } from "./SubAppHeader";
 export { AdminTable } from "./AdminTable";
 export type { AdminTableColumn, AdminTableProps } from "./AdminTable";
 export { AmbientBackground } from "./AmbientBackground";
