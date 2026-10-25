@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
@@ -202,40 +202,70 @@ export function SubAppHeader({
   const [devSettingsOpen, setDevSettingsOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-30" style={{ background: GRADIENT, color: "#fff" }}>
+    <Box
+      component="header"
+      sx={{ position: "sticky", top: 0, zIndex: 30, background: GRADIENT, color: "#fff" }}
+    >
       {/* ── Title row ──────────────────────────────────────────────────── */}
-      <div className="mx-auto flex max-w-[72rem] flex-wrap items-start justify-between gap-x-6 gap-y-3 px-6 pb-2 pt-4">
+      <Box
+        sx={{
+          mx: "auto",
+          display: "flex",
+          maxWidth: 1152,
+          flexWrap: "wrap",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          columnGap: 3,
+          rowGap: 1.5,
+          px: 3,
+          pb: 1,
+          pt: 2,
+        }}
+      >
         {/* Left: home link + app title + subtitle */}
-        <div className="flex min-w-0 items-center gap-2 [flex:1_1_320px]">
+        <Box sx={{ display: "flex", minWidth: 0, alignItems: "center", gap: 1, flex: "1 1 320px" }}>
           {homeLink ? (
-            <div className="-ml-2 flex-shrink-0">{homeLink}</div>
+            <Box sx={{ flexShrink: 0 }}>{homeLink}</Box>
           ) : null}
-          <div className="min-w-0">
+          <Box sx={{ minWidth: 0 }}>
             {onTitleClick ? (
-              <button
+              <Box
+                component="button"
                 type="button"
                 onClick={onTitleClick}
-                className="cursor-pointer border-0 bg-transparent p-0 text-left text-[17px] font-semibold leading-tight tracking-tight text-white hover:text-white/85"
-                style={{ fontFamily: "inherit" }}
+                sx={{
+                  cursor: "pointer",
+                  border: 0,
+                  bgcolor: "transparent",
+                  p: 0,
+                  textAlign: "left",
+                  fontSize: 17,
+                  fontWeight: 600,
+                  lineHeight: 1.25,
+                  letterSpacing: "-0.01em",
+                  color: "#fff",
+                  fontFamily: "inherit",
+                  "&:hover": { color: "rgba(255,255,255,0.85)" },
+                }}
               >
                 {title}
-              </button>
+              </Box>
             ) : (
-              <div className="text-[17px] font-semibold leading-tight tracking-tight text-white">
+              <Box sx={{ fontSize: 17, fontWeight: 600, lineHeight: 1.25, letterSpacing: "-0.01em", color: "#fff" }}>
                 {title}
-              </div>
+              </Box>
             )}
             {subtitle ? (
-              <div className="mt-0.5 text-[13px] leading-snug text-white/65">
+              <Box sx={{ mt: 0.25, fontSize: 13, lineHeight: 1.375, color: "rgba(255,255,255,0.65)" }}>
                 {subtitle}
-              </div>
+              </Box>
             ) : null}
-          </div>
-        </div>
+          </Box>
+        </Box>
 
         {/* Right: identity + preview-as + settings */}
         {hasRight ? (
-          <div className="ml-auto flex shrink-0 flex-wrap items-center gap-3">
+          <Box sx={{ ml: "auto", display: "flex", flexShrink: 0, flexWrap: "wrap", alignItems: "center", gap: 1.5 }}>
             {rightSlotLoading ? (
               <Skeleton
                 variant="rounded"
@@ -331,60 +361,87 @@ export function SubAppHeader({
               </Stack>
             ) : null}
             {rightSlot}
-          </div>
+          </Box>
         ) : null}
-      </div>
+      </Box>
 
       {/* ── Banner slot (inside brand band, above tabs) ─────────────────── */}
       {banner}
 
       {/* ── Tab strip (inherits header gradient) ────────────────────────── */}
       {hasTabs ? (
-        <nav aria-label="Primary navigation">
-          <div className="mx-auto max-w-[72rem] px-6">
-            <ul className="flex gap-x-1 overflow-x-auto">
+        <Box component="nav" aria-label="Primary navigation">
+          <Box sx={{ mx: "auto", maxWidth: 1152, px: 3 }}>
+            <Box
+              component="ul"
+              sx={{ display: "flex", columnGap: 0.5, overflowX: "auto", listStyle: "none", m: 0, p: 0 }}
+            >
               {tabs!.map((tab) => {
                 const isActive = tab.key === activeTab;
                 const showBadge = tab.badge != null && tab.badge > 0;
                 return (
-                  <li key={tab.key} className="flex-shrink-0">
-                    <button
+                  <Box component="li" key={tab.key} sx={{ flexShrink: 0 }}>
+                    <Box
+                      component="button"
                       type="button"
                       onClick={() => onTabChange?.(tab.key)}
                       aria-current={isActive ? "page" : undefined}
-                      className={
-                        "flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 pb-2.5 pt-1.5 text-sm transition-colors " +
-                        (isActive
-                          ? "border-white font-semibold text-white"
-                          : "border-transparent font-medium text-white/65 hover:border-white/30 hover:text-white")
-                      }
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.75,
+                        whiteSpace: "nowrap",
+                        border: 0,
+                        borderBottom: "2px solid",
+                        borderBottomColor: isActive ? "#fff" : "transparent",
+                        px: 1.5,
+                        pb: 1.25,
+                        pt: 0.75,
+                        fontSize: 14,
+                        fontWeight: isActive ? 600 : 500,
+                        color: isActive ? "#fff" : "rgba(255,255,255,0.65)",
+                        fontFamily: "inherit",
+                        bgcolor: "transparent",
+                        cursor: "pointer",
+                        transition: "color 0.15s, border-color 0.15s",
+                        "&:hover": isActive
+                          ? {}
+                          : { borderBottomColor: "rgba(255,255,255,0.30)", color: "#fff" },
+                      }}
                     >
                       {tab.label}
                       {showBadge ? (
-                        <span
-                          className={
-                            "min-w-[20px] rounded-full px-1.5 py-px text-center text-[11px] font-semibold tabular-nums " +
-                            (isActive
-                              ? "bg-white text-[#1d6ffe]"
-                              : "bg-white/15 text-white/80")
-                          }
+                        <Box
+                          component="span"
+                          sx={{
+                            minWidth: 20,
+                            borderRadius: 9999,
+                            px: 0.75,
+                            py: "1px",
+                            textAlign: "center",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            fontVariantNumeric: "tabular-nums",
+                            bgcolor: isActive ? "#fff" : "rgba(255,255,255,0.15)",
+                            color: isActive ? "#1d6ffe" : "rgba(255,255,255,0.80)",
+                          }}
                         >
                           {tab.badge}
-                        </span>
+                        </Box>
                       ) : null}
-                    </button>
-                  </li>
+                    </Box>
+                  </Box>
                 );
               })}
-            </ul>
-          </div>
-        </nav>
+            </Box>
+          </Box>
+        </Box>
       ) : null}
 
       {/* ── Dev settings modal ──────────────────────────────────────────── */}
       {devSettingsAppId && devSettingsOpen ? (
         <DevSettingsDialog appId={devSettingsAppId} onClose={() => setDevSettingsOpen(false)} />
       ) : null}
-    </header>
+    </Box>
   );
 }
