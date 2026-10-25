@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/visdomtech/orca-ui/compare/v1.1.1...v1.2.0) (2026-10-25)
+
+
+### Features
+
+* create sub app header component ([#12](https://github.com/visdomtech/orca-ui/issues/12)) ([ef956a5](https://github.com/visdomtech/orca-ui/commit/ef956a5294c236811c854f624b495555e396cab5))
+
 ## [1.1.1](https://github.com/visdomtech/orca-ui/compare/v1.1.0...v1.1.1) (2026-10-22)
 
 
