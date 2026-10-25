@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/visdomtech/orca-ui/compare/v1.2.0...v1.2.1) (2026-10-25)
+
+
+### Bug Fixes
+
+* use mui style instead of tailwind ([#14](https://github.com/visdomtech/orca-ui/issues/14)) ([24eb43b](https://github.com/visdomtech/orca-ui/commit/24eb43b9823d2439a7f9937dd326a5f93fca8f96))
+
 ## [1.2.0](https://github.com/visdomtech/orca-ui/compare/v1.1.1...v1.2.0) (2026-10-25)
 
 
