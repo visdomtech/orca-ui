@@ -189,7 +189,6 @@ export function SubAppHeader({
   onTabChange,
   rightSlotLoading,
   userEmail,
-  userName,
   devSettingsAppId,
   isAdmin,
   previewLabel,
