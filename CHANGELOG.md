@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/visdomtech/orca-ui/compare/v1.2.1...v1.2.2) (2026-10-26)
+
+
+### Bug Fixes
+
+* Access matrix is disabled after change bug and remove username f… ([#16](https://github.com/visdomtech/orca-ui/issues/16)) ([730cbfe](https://github.com/visdomtech/orca-ui/commit/730cbfe3125d4c2cf46e47afcf087ce54aa5b89f))
+
 ## [1.2.1](https://github.com/visdomtech/orca-ui/compare/v1.2.0...v1.2.1) (2026-10-25)
 
 
