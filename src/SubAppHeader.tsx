@@ -189,7 +189,6 @@ export function SubAppHeader({
   onTabChange,
   rightSlotLoading,
   userEmail,
-  userName,
   devSettingsAppId,
   isAdmin,
   previewLabel,
@@ -277,13 +276,8 @@ export function SubAppHeader({
               <Stack direction="column" spacing={0.5} sx={{ alignItems: "flex-end" }}>
                 {/* Row 1: name · email + gear */}
                 <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                  {userName ? (
-                    <Typography sx={{ fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.9)" }}>
-                      {userName}
-                    </Typography>
-                  ) : null}
                   <Typography sx={{ display: { xs: "none", lg: "inline" }, fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
-                    {userName ? `· ${userEmail}` : userEmail}
+                    {userEmail}
                   </Typography>
                   {devSettingsAppId ? (
                     <IconButton

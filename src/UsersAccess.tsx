@@ -1229,7 +1229,8 @@ function MatrixPane({
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDeleteRole, setConfirmDeleteRole] = useState<string | undefined>();
   const [editing, setEditing] = useState(false);
-  const [batchGranting, setBatchGranting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [localOverrides, setLocalOverrides] = useState<Record<string, Set<string>>>({});
   const [addingRole, setAddingRole] = useState(false);
   const [newRoleLabel, setNewRoleLabel] = useState("");
 
@@ -1238,7 +1239,7 @@ function MatrixPane({
   const hrRolesForMatrix = useMemo(() => hrRoles.filter((r) => !appRoleCodes.has(r.code)), [hrRoles, appRoleCodes]);
   const staticGrantingRoles = roles.filter((r) => r.code !== "NONE");
   const grantingRoles = [...hrRolesForMatrix, ...staticGrantingRoles, ...customRoles];
-  const isMutating = grant.isPending || revoke.isPending || reset.isPending || createCustomRole.isPending || deleteCustomRole.isPending || batchGranting;
+  const isMutating = grant.isPending || revoke.isPending || reset.isPending || createCustomRole.isPending || deleteCustomRole.isPending || saving;
   const isCustomized = dbPairs.length > 0;
   const newRoleCode = newRoleLabel.trim().toUpperCase().replace(/\s+/g, "_");
 
@@ -1254,31 +1255,40 @@ function MatrixPane({
     return new Set(dbForCap.length > 0 ? dbForCap.map((p) => p.roleCode) : (cap.defaultRoles ?? []));
   }
 
+  function effectiveRolesWithOverrides(cap: AppCapability): Set<string> {
+    return localOverrides[cap.code] ?? effectiveRoles(cap);
+  }
+
   function handleToggle(cap: AppCapability, roleCode: string) {
-    const dbForCap = dbPairs.filter((p) => p.capabilityCode === cap.code);
-    const isInDBMode = dbForCap.length > 0;
-    const effective = effectiveRoles(cap);
-    const isOn = effective.has(roleCode);
-    if (isInDBMode) {
-      if (isOn) revoke.mutate({ capabilityCode: cap.code, roleCode });
-      else grant.mutate({ capabilityCode: cap.code, roleCode });
-    } else {
-      const next = new Set(effective);
-      if (isOn) next.delete(roleCode);
-      else next.add(roleCode);
-      const rolesList = [...next];
-      if (rolesList.length === 0) return;
-      let settled = 0;
-      setBatchGranting(true);
-      for (const r of rolesList) {
-        grant.mutate({ capabilityCode: cap.code, roleCode: r }, {
-          onSettled: () => {
-            settled++;
-            if (settled === rolesList.length) setBatchGranting(false);
-          },
-        });
+    const current = effectiveRolesWithOverrides(cap);
+    const next = new Set(current);
+    if (next.has(roleCode)) next.delete(roleCode);
+    else next.add(roleCode);
+    setLocalOverrides(prev => ({ ...prev, [cap.code]: next }));
+  }
+
+  function handleDone() {
+    const overrideEntries = Object.entries(localOverrides);
+    if (overrideEntries.length === 0) { setEditing(false); return; }
+    const grants: { capabilityCode: string; roleCode: string }[] = [];
+    const revokes: { capabilityCode: string; roleCode: string }[] = [];
+    for (const [capCode, desiredRoles] of overrideEntries) {
+      const cap = capabilities.find(c => c.code === capCode);
+      if (!cap) continue;
+      const currentRoles = effectiveRoles(cap);
+      for (const role of desiredRoles) {
+        if (!currentRoles.has(role)) grants.push({ capabilityCode: capCode, roleCode: role });
+      }
+      for (const role of currentRoles) {
+        if (!desiredRoles.has(role)) revokes.push({ capabilityCode: capCode, roleCode: role });
       }
     }
+    if (grants.length === 0 && revokes.length === 0) { setLocalOverrides({}); setEditing(false); return; }
+    setSaving(true);
+    Promise.allSettled([
+      ...grants.map(g => grant.mutateAsync(g)),
+      ...revokes.map(r => revoke.mutateAsync(r)),
+    ]).then(() => { setSaving(false); setLocalOverrides({}); setEditing(false); });
   }
 
   const closeConfirmReset = useCallback(() => { if (!reset.isPending) setConfirmReset(false); }, [reset.isPending]);
@@ -1296,7 +1306,7 @@ function MatrixPane({
                 <SecondaryButton onClick={() => setConfirmReset(true)} disabled={isMutating}>Reset to defaults</SecondaryButton>
               )}
               <SecondaryButton onClick={() => setAddingRole(true)} disabled={addingRole || isMutating}>+ Add role</SecondaryButton>
-              <PrimaryButton onClick={() => setEditing(false)} disabled={isMutating}>Done</PrimaryButton>
+              <PrimaryButton onClick={handleDone} disabled={isMutating}>{saving ? "Saving…" : "Done"}</PrimaryButton>
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -1355,7 +1365,7 @@ function MatrixPane({
           ),
         ]}>
           {capabilities.map((cap) => {
-            const effective = effectiveRoles(cap);
+            const effective = effectiveRolesWithOverrides(cap);
             return (
               <tr key={cap.code} className="hover:bg-slate-50">
                 <td className="px-3 py-2 text-slate-700">{cap.label}</td>
@@ -1389,7 +1399,7 @@ function MatrixPane({
           footer={
             <>
               <SecondaryButton onClick={() => setConfirmReset(false)} disabled={reset.isPending}>Cancel</SecondaryButton>
-              <PrimaryButton onClick={() => reset.mutate(undefined, { onSuccess: () => setConfirmReset(false) })} disabled={reset.isPending}>
+              <PrimaryButton onClick={() => reset.mutate(undefined, { onSuccess: () => { setConfirmReset(false); setLocalOverrides({}); } })} disabled={reset.isPending}>
                 {reset.isPending ? "Resetting…" : "Reset to defaults"}
               </PrimaryButton>
             </>
