@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.3](https://github.com/visdomtech/orca-ui/compare/v1.2.2...v1.2.3) (2026-10-27)
+
+
+### Bug Fixes
+
+* add fullwidth option to subHeader component ([#18](https://github.com/visdomtech/orca-ui/issues/18)) ([bd79da1](https://github.com/visdomtech/orca-ui/commit/bd79da11dec7bcc0dd2547c8366c2d04cff518da))
+
 ## [1.2.2](https://github.com/visdomtech/orca-ui/compare/v1.2.1...v1.2.2) (2026-10-26)
 
 
