@@ -1,6 +1,6 @@
 {
   "name": "@doublefin/orca-ui",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "repository": "github:visdomtech/orca-ui",
   "type": "module",
   "sideEffects": [
