@@ -119,6 +119,8 @@ export interface SubAppHeaderProps {
   previewValue?: string | null;
   /** Called with the new value, or null when switching back to own view. */
   onPreviewChange?: (value: string | null) => void;
+  /** Remove the max-width cap so the header spans the full viewport. Default: false. */
+  fullWidth?: boolean;
 }
 
 // ── Dev settings modal ────────────────────────────────────────────────────────
@@ -195,7 +197,9 @@ export function SubAppHeader({
   previewOptions,
   previewValue,
   onPreviewChange,
+  fullWidth = false,
 }: SubAppHeaderProps) {
+  const maxWidth = fullWidth ? undefined : 1152;
   const hasTabs = (tabs?.length ?? 0) > 0;
   const hasRight = rightSlotLoading || userEmail || rightSlot;
   const [devSettingsOpen, setDevSettingsOpen] = useState(false);
@@ -210,7 +214,7 @@ export function SubAppHeader({
         sx={{
           mx: "auto",
           display: "flex",
-          maxWidth: 1152,
+          maxWidth,
           flexWrap: "wrap",
           alignItems: "flex-start",
           justifyContent: "space-between",
@@ -365,7 +369,7 @@ export function SubAppHeader({
       {/* ── Tab strip (inherits header gradient) ────────────────────────── */}
       {hasTabs ? (
         <Box component="nav" aria-label="Primary navigation">
-          <Box sx={{ mx: "auto", maxWidth: 1152, px: 3 }}>
+          <Box sx={{ mx: "auto", maxWidth, px: 3 }}>
             <Box
               component="ul"
               sx={{ display: "flex", columnGap: 0.5, overflowX: "auto", listStyle: "none", m: 0, p: 0 }}
