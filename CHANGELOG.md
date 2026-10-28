@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.4](https://github.com/visdomtech/orca-ui/compare/v1.2.3...v1.2.4) (2026-10-28)
+
+
+### Bug Fixes
+
+* header right slot should be rows ([#20](https://github.com/visdomtech/orca-ui/issues/20)) ([3a19f84](https://github.com/visdomtech/orca-ui/commit/3a19f84ec7d77488c32b5e22d3165a045d9d85fb))
+
 ## [1.2.3](https://github.com/visdomtech/orca-ui/compare/v1.2.2...v1.2.3) (2026-10-27)
 
 
