@@ -276,89 +276,94 @@ export function SubAppHeader({
                 height={42}
                 sx={{ bgcolor: "rgba(255,255,255,0.15)" }}
               />
-            ) : userEmail ? (
+            ) : (
               <Stack direction="column" spacing={0.5} sx={{ alignItems: "flex-end" }}>
-                {/* Row 1: name · email + gear */}
-                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                  <Typography sx={{ display: { xs: "none", lg: "inline" }, fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
-                    {userEmail}
-                  </Typography>
-                  {devSettingsAppId ? (
-                    <IconButton
-                      size="small"
-                      title="Dev settings"
-                      onClick={() => setDevSettingsOpen(true)}
-                      sx={{ color: "rgba(255,255,255,0.75)", "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.1)" } }}
-                    >
-                      <SettingsOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  ) : null}
-                </Stack>
-                {/* Row 2: Preview as (admin only) */}
-                {isAdmin && previewOptions ? (
-                  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                    <Typography
-                      component="label"
-                      htmlFor="subapp-preview-as"
-                      sx={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}
-                    >
-                      Preview as
-                    </Typography>
-                    <TextField
-                      select
-                      size="small"
-                      id="subapp-preview-as"
-                      value={previewValue ?? ""}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        onPreviewChange?.(v === "" ? null : v);
-                      }}
-                      sx={{
-                        minWidth: 200,
-                        maxWidth: 310,
-                        "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: 2, fontSize: 13, height: 32 },
-                        "& .MuiOutlinedInput-notchedOutline": { borderColor: "transparent" },
-                      }}
-                      slotProps={{
-                        select: {
-                          displayEmpty: true,
-                          renderValue: (v) =>
-                            v === ""
-                              ? (previewLabel ?? "My view")
-                              : (previewOptions.find((o) => o.value === String(v))?.label ?? String(v)),
-                          MenuProps: { slotProps: { paper: { sx: { maxHeight: 440 } } } },
-                        },
-                      }}
-                    >
-                      <MenuItem value="" sx={{ fontSize: 13, minHeight: 0, py: 0.75 }}>
-                        {previewLabel ?? "My view"}
-                      </MenuItem>
-                      {previewOptions.flatMap((opt) => [
-                        ...(opt.groupLabel ? [
-                          <ListSubheader key={`${opt.value}-group`} sx={{ fontSize: 11, lineHeight: "18px", fontWeight: 700, pt: 1.25, pb: 0.25 }}>
-                            {opt.groupLabel}
-                          </ListSubheader>,
-                        ] : []),
-                        <MenuItem
-                          key={opt.value}
-                          value={opt.value}
+                {userEmail ? (
+                  <>
+                    {/* Row 1: name · email + gear */}
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                      <Typography sx={{ display: { xs: "none", lg: "inline" }, fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
+                        {userEmail}
+                      </Typography>
+                      {devSettingsAppId ? (
+                        <IconButton
+                          size="small"
+                          title="Dev settings"
+                          onClick={() => setDevSettingsOpen(true)}
+                          sx={{ color: "rgba(255,255,255,0.75)", "&:hover": { color: "#fff", bgcolor: "rgba(255,255,255,0.1)" } }}
+                        >
+                          <SettingsOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      ) : null}
+                    </Stack>
+                    {/* Row 2: Preview as (admin only) */}
+                    {isAdmin && previewOptions ? (
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                        <Typography
+                          component="label"
+                          htmlFor="subapp-preview-as"
+                          sx={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}
+                        >
+                          Preview as
+                        </Typography>
+                        <TextField
+                          select
+                          size="small"
+                          id="subapp-preview-as"
+                          value={previewValue ?? ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            onPreviewChange?.(v === "" ? null : v);
+                          }}
                           sx={{
-                            fontSize: 13,
-                            ...(opt.groupLabel ? { pl: 3 } : {}),
-                            minHeight: 0,
-                            py: opt.groupLabel ? 0.5 : 0.75,
-                            ...(opt.dividerBefore ? { borderTop: 1, borderColor: "divider" } : {}),
+                            minWidth: 200,
+                            maxWidth: 310,
+                            "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: 2, fontSize: 13, height: 32 },
+                            "& .MuiOutlinedInput-notchedOutline": { borderColor: "transparent" },
+                          }}
+                          slotProps={{
+                            select: {
+                              displayEmpty: true,
+                              renderValue: (v) =>
+                                v === ""
+                                  ? (previewLabel ?? "My view")
+                                  : (previewOptions.find((o) => o.value === String(v))?.label ?? String(v)),
+                              MenuProps: { slotProps: { paper: { sx: { maxHeight: 440 } } } },
+                            },
                           }}
                         >
-                          {opt.label}
-                        </MenuItem>,
-                      ])}
-                    </TextField>
-                  </Stack>
+                          <MenuItem value="" sx={{ fontSize: 13, minHeight: 0, py: 0.75 }}>
+                            {previewLabel ?? "My view"}
+                          </MenuItem>
+                          {previewOptions.flatMap((opt) => [
+                            ...(opt.groupLabel ? [
+                              <ListSubheader key={`${opt.value}-group`} sx={{ fontSize: 11, lineHeight: "18px", fontWeight: 700, pt: 1.25, pb: 0.25 }}>
+                                {opt.groupLabel}
+                              </ListSubheader>,
+                            ] : []),
+                            <MenuItem
+                              key={opt.value}
+                              value={opt.value}
+                              sx={{
+                                fontSize: 13,
+                                ...(opt.groupLabel ? { pl: 3 } : {}),
+                                minHeight: 0,
+                                py: opt.groupLabel ? 0.5 : 0.75,
+                                ...(opt.dividerBefore ? { borderTop: 1, borderColor: "divider" } : {}),
+                              }}
+                            >
+                              {opt.label}
+                            </MenuItem>,
+                          ])}
+                        </TextField>
+                      </Stack>
+                    ) : null}
+                  </>
                 ) : null}
+                {/* Row 3: right slot (period picker, etc.) */}
+                {rightSlot}
               </Stack>
-            ) : null}
-            {rightSlot}
+            )}
           </Box>
         ) : null}
       </Box>
