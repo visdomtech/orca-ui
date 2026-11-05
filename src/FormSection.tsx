@@ -1,8 +1,7 @@
-import Box from "@mui/material/Box";
-import Divider from "@mui/material/Divider";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
+import { Divider, Space, Typography } from "antd";
 import type { ReactNode } from "react";
+
+const { Text } = Typography;
 
 export interface FormSectionProps {
   title: string;
@@ -12,17 +11,28 @@ export interface FormSectionProps {
 
 export function FormSection({ title, description, children }: FormSectionProps) {
   return (
-    <Box sx={{ mb: 4 }}>
-      <Typography variant="overline" sx={{ display: "block", color: "text.secondary" }}>
+    <div style={{ marginBottom: 32 }}>
+      <Text
+        style={{
+          display: "block",
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "rgba(0,0,0,0.65)",
+        }}
+      >
         {title}
-      </Typography>
+      </Text>
       {description && (
-        <Typography variant="caption" sx={{ display: "block", color: "text.secondary", mt: 0.5 }}>
+        <Text style={{ display: "block", fontSize: 12, color: "rgba(0,0,0,0.45)", marginTop: 4 }}>
           {description}
-        </Typography>
+        </Text>
       )}
-      <Divider sx={{ my: 2 }} />
-      <Stack spacing={2.5}>{children}</Stack>
-    </Box>
+      <Divider style={{ margin: "16px 0" }} />
+      <Space direction="vertical" size={20} style={{ width: "100%" }}>
+        {children}
+      </Space>
+    </div>
   );
 }

@@ -26,9 +26,13 @@
     "build": "tailwindcss -i src/styles.css -o src/_compiled.css --minify && tsup",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "showcase": "vite --config showcase/vite.config.ts",
+    "showcase:build": "SHOWCASE_DEPLOY=docs vite build --config showcase/vite.config.ts",
     "prepublishOnly": "bun run typecheck && bun run build"
   },
   "peerDependencies": {
+    "antd": "^6",
+    "@ant-design/icons": "^6",
     "@mui/icons-material": "^9",
     "@mui/material": "^9",
     "@emotion/react": "^11",
@@ -50,8 +54,10 @@
     "@mui/material": "^9",
     "@tailwindcss/cli": "^4.3.3",
     "@tanstack/react-query": "^5.62.0",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
     "eslint": "^10.7.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
@@ -61,6 +67,12 @@
     "tailwindcss": "^4.3.3",
     "tsup": "^8",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.65.0"
+    "typescript-eslint": "^8.65.0",
+    "vite": "^7.0.0"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.3.4",
+    "antd": "^6.6.8",
+    "dayjs": "^1.11.23"
   }
 }
