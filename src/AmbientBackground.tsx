@@ -1,24 +1,18 @@
-import Box from "@mui/material/Box";
+import type { CSSProperties } from "react";
 
-/** Vivid ambient gradient background layer.
- *  Renders behind content (z-index: -1, pointer-events: none).
- *  Four gradient blobs (silver, accent, highlight, rose) at 12-18% opacity
- *  with blur(100px), drifting via CSS keyframes.
- *  Uses CSS classes from the liquid.css file (lm-ambient, lm-ambient__blob, etc.).
- *  The host app must import the liquid CSS file for animations to work. */
+/** Vivid ambient gradient background layer. The host app must import the liquid CSS file for animations to work. */
 export interface AmbientBackgroundProps {
-  /** Additional sx props merged onto the root container. */
-  sx?: Record<string, unknown>;
+  style?: CSSProperties;
 }
 
-export function AmbientBackground({ sx }: AmbientBackgroundProps) {
+export function AmbientBackground({ style }: AmbientBackgroundProps) {
   return (
-    <Box className="lm-ambient" aria-hidden sx={sx}>
-      <Box className="lm-ambient__blob lm-ambient__blob--silver" />
-      <Box className="lm-ambient__blob lm-ambient__blob--accent" />
-      <Box className="lm-ambient__blob lm-ambient__blob--highlight" />
-      <Box className="lm-ambient__blob lm-ambient__blob--rose" />
-      <Box className="lm-ambient__noise" />
-    </Box>
+    <div className="lm-ambient" aria-hidden style={style}>
+      <div className="lm-ambient__blob lm-ambient__blob--silver" />
+      <div className="lm-ambient__blob lm-ambient__blob--accent" />
+      <div className="lm-ambient__blob lm-ambient__blob--highlight" />
+      <div className="lm-ambient__blob lm-ambient__blob--rose" />
+      <div className="lm-ambient__noise" />
+    </div>
   );
 }

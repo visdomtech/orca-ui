@@ -1,45 +1,50 @@
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Typography from "@mui/material/Typography";
+import { ArrowLeftOutlined } from "@ant-design/icons";
+import { Button, Space, Typography } from "antd";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+
+const { Title, Text } = Typography;
 
 export interface PageHeaderProps {
   title: string;
   subtitle?: string;
-  /** Right-aligned action buttons (Refresh, Create…). */
   actions?: ReactNode;
-  /** When set, renders a back link above the title (react-router). */
   backHref?: string;
   backLabel?: string;
 }
 
 export function PageHeader({ title, subtitle, actions, backHref, backLabel = "Back" }: PageHeaderProps) {
   return (
-    <Box sx={{ mb: 3 }}>
+    <div style={{ marginBottom: 24 }}>
       {backHref && (
         <Button
-          component={Link}
-          to={backHref}
+          type="text"
           size="small"
-          startIcon={<ArrowBackIcon />}
-          sx={{ mb: 1, ml: -1, color: "text.secondary" }}
+          icon={<ArrowLeftOutlined />}
+          style={{ marginBottom: 8, marginLeft: -8, color: "rgba(0,0,0,0.65)" }}
         >
-          {backLabel}
+          <Link to={backHref} style={{ color: "inherit" }}>
+            {backLabel}
+          </Link>
         </Button>
       )}
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h5">{title}</Typography>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        <div style={{ minWidth: 0 }}>
+          <Title level={4} style={{ margin: 0 }}>
+            {title}
+          </Title>
           {subtitle && (
-            <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
+            <Text type="secondary" style={{ display: "block", marginTop: 4 }}>
               {subtitle}
-            </Typography>
+            </Text>
           )}
-        </Box>
-        {actions && <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>{actions}</Box>}
-      </Box>
-    </Box>
+        </div>
+        {actions && (
+          <Space size={8} style={{ flexShrink: 0 }}>
+            {actions}
+          </Space>
+        )}
+      </div>
+    </div>
   );
 }

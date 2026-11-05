@@ -1,21 +1,18 @@
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Typography from "@mui/material/Typography";
+import { ArrowLeftOutlined } from "@ant-design/icons";
+import { Button, Space, Typography } from "antd";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+
+const { Title, Text } = Typography;
 
 export interface DetailLayoutProps {
   title: string;
   subtitle?: string;
-  /** Status slot next to the title — pass <StatusPill/>. */
   status?: ReactNode;
-  /** Leading visual (e.g. a large Avatar on a user detail page). */
   avatar?: ReactNode;
   actions?: ReactNode;
   backHref?: string;
   backLabel?: string;
-  /** Sections, Tabs, panels — composition only; DetailLayout never owns tab state. */
   children: ReactNode;
 }
 
@@ -30,34 +27,32 @@ export function DetailLayout({
   children,
 }: DetailLayoutProps) {
   return (
-    <Box>
+    <div>
       {backHref && (
-        <Button
-          component={Link}
-          to={backHref}
-          size="small"
-          startIcon={<ArrowBackIcon />}
-          sx={{ mb: 1, ml: -1, color: "text.secondary" }}
-        >
-          {backLabel}
+        <Button type="text" size="small" icon={<ArrowLeftOutlined />} style={{ marginBottom: 8, marginLeft: -8 }}>
+          <Link to={backHref} style={{ color: "inherit" }}>
+            {backLabel}
+          </Link>
         </Button>
       )}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
         {avatar}
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="h5">{title}</Typography>
+        <div style={{ flexGrow: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Title level={4} style={{ margin: 0 }}>
+              {title}
+            </Title>
             {status}
-          </Box>
+          </div>
           {subtitle && (
-            <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>
+            <Text type="secondary" style={{ display: "block", marginTop: 4 }}>
               {subtitle}
-            </Typography>
+            </Text>
           )}
-        </Box>
-        {actions && <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>{actions}</Box>}
-      </Box>
+        </div>
+        {actions && <Space size={8}>{actions}</Space>}
+      </div>
       {children}
-    </Box>
+    </div>
   );
 }

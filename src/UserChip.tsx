@@ -1,14 +1,10 @@
-import Avatar from "@mui/material/Avatar";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
-import type { SxProps, Theme } from "@mui/material/styles";
+import { Avatar as AntAvatar } from "antd";
 
 export interface UserChipProps {
   name: string;
   title?: string;
   avatarUrl?: string;
   size?: "sm" | "md" | "lg";
-  sx?: SxProps<Theme>;
 }
 
 const AVATAR_SIZE = { sm: 28, md: 36, lg: 44 } as const;
@@ -20,47 +16,53 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function UserChip({ name, title, avatarUrl, size = "md", sx }: UserChipProps) {
+export function UserChip({ name, title, avatarUrl, size = "md" }: UserChipProps) {
   const avatarSize = AVATAR_SIZE[size];
   return (
-    <Box
-      sx={[
-        { display: "flex", alignItems: "center", gap: 1.5 },
-        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
-      ]}
-    >
-      <Avatar
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <AntAvatar
         src={avatarUrl}
-        aria-label={name}
-        sx={{
-          width: avatarSize,
-          height: avatarSize,
+        alt={name}
+        size={avatarSize}
+        style={{
           fontSize: avatarSize * 0.38,
           fontWeight: 600,
-          bgcolor: "primary.main",
           flexShrink: 0,
+          background: "#1677FF",
+          color: "#fff",
         }}
       >
         <span aria-hidden="true">{initials(name)}</span>
-      </Avatar>
-      <Box sx={{ minWidth: 0 }}>
-        <Typography
-          variant={size === "lg" ? "body1" : "body2"}
-          sx={{ fontWeight: 500, color: "text.primary", lineHeight: 1.3 }}
-          noWrap
+      </AntAvatar>
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: size === "lg" ? 14 : 13,
+            fontWeight: 500,
+            color: "rgba(0,0,0,0.88)",
+            lineHeight: 1.3,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
         >
           {name}
-        </Typography>
+        </div>
         {title ? (
-          <Typography
-            variant={size === "lg" ? "body2" : "caption"}
-            sx={{ color: "text.secondary", lineHeight: 1.3, display: "block" }}
-            noWrap
+          <div
+            style={{
+              fontSize: size === "lg" ? 12 : 11,
+              color: "rgba(0,0,0,0.45)",
+              lineHeight: 1.3,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
           >
             {title}
-          </Typography>
+          </div>
         ) : null}
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 }
