@@ -1,0 +1,25 @@
+version: "3"
+
+vars:
+  DOCS_REPO: "../docs.doublefin.com"
+  SHORT_SHA:
+    sh: git rev-parse --short HEAD
+
+tasks:
+  docs:sync-showcase:
+    desc: Build the orca-ui showcase and sync it into docs.doublefin.com/public/showcase
+    cmds:
+      - test -d {{.DOCS_REPO}} || { echo "ERROR: {{.DOCS_REPO}} not found. Clone docs.doublefin.com next to orca-ui." >&2; exit 1; }
+      - bun run showcase:build
+      - node scripts/sync-showcase-to-docs.mjs
+      - |
+        cd {{.DOCS_REPO}} && git add public/showcase && \
+          if git diff --cached --quiet -- public/showcase; then \
+            echo "No changes to showcase bundle — skipping commit."; \
+          else \
+            git commit -m "sync showcase from orca-ui {{.SHORT_SHA}}"; \
+          fi
+      - echo ""
+      - echo "── Showcase synced ───────────────────────────────────────"
+      - echo "   Review the commit in {{.DOCS_REPO}}, then run 'bun run deploy' there."
+      - echo "   Live at https://docs.doublefin.com/showcase/ after deploy."

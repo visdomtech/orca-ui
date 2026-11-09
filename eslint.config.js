@@ -3,7 +3,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  { ignores: ["dist", "showcase/dist"] },
   ...tseslint.configs.recommended,
   {
     plugins: {

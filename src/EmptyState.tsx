@@ -1,9 +1,7 @@
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
+import { Empty } from "antd";
 import type { ReactNode } from "react";
 
 export interface EmptyStateProps {
-  /** Required — a designed empty state always has a visual anchor. */
   icon: ReactNode;
   title: string;
   description?: string;
@@ -12,17 +10,20 @@ export interface EmptyStateProps {
 
 export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 6, textAlign: "center" }}>
-      <Box sx={{ color: "text.disabled", mb: 1.5, "& svg": { fontSize: 40 } }}>{icon}</Box>
-      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-        {title}
-      </Typography>
-      {description && (
-        <Typography variant="caption" sx={{ color: "text.secondary", mt: 0.5, maxWidth: 360 }}>
-          {description}
-        </Typography>
-      )}
-      {action && <Box sx={{ mt: 2 }}>{action}</Box>}
-    </Box>
+    <Empty
+      image={<div style={{ fontSize: 40, color: "rgba(0,0,0,0.25)", display: "flex", justifyContent: "center" }}>{icon}</div>}
+      description={
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "rgba(0,0,0,0.88)" }}>{title}</div>
+          {description && (
+            <div style={{ fontSize: 12, color: "rgba(0,0,0,0.45)", marginTop: 4, maxWidth: 360, marginInline: "auto" }}>
+              {description}
+            </div>
+          )}
+        </div>
+      }
+    >
+      {action}
+    </Empty>
   );
 }

@@ -1,5 +1,7 @@
 node_modules
 dist
+showcase/dist
 src/_compiled.css
 .DS_Store
 *.log
+*.tgz
