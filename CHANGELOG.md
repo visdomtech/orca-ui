@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/visdomtech/orca-ui/compare/v1.2.4...v1.3.0) (2026-11-09)
+
+
+### Features
+
+* add antd components ([#22](https://github.com/visdomtech/orca-ui/issues/22)) ([7ca8a83](https://github.com/visdomtech/orca-ui/commit/7ca8a833774b64c3e506732951f1194608887983))
+
 ## [1.2.4](https://github.com/visdomtech/orca-ui/compare/v1.2.3...v1.2.4) (2026-10-28)
 
 
