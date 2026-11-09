@@ -229,6 +229,17 @@ const USERS = [
   { name: "Linus T", email: "linus@orca.dev" },
 ];
 
+const HC_TREND_SERIES = [
+  {
+    id: "hc",
+    label: "Headcount",
+    points: [1, 2, 3, 4, 5, 6, 7, 8].map((m) => ({
+      x: `M${m}`,
+      y: 3800 + m * 50 + Math.round(Math.random() * 30),
+    })),
+  },
+];
+
 // ----------------------------- Chip ---------------------------------
 
 export function ChipStory() {
@@ -858,7 +869,7 @@ export function DashboardShellStory() {
               </Card.Header>
               <Card.Body>
                 <TrendChart
-                  series={[{ id: "hc", label: "Headcount", points: [1, 2, 3, 4, 5, 6, 7, 8].map((m) => ({ x: `M${m}`, y: 3800 + m * 50 + Math.round(Math.random() * 30) })) }]}
+                  series={HC_TREND_SERIES}
                   height={200}
                 />
               </Card.Body>
@@ -1680,33 +1691,35 @@ export function EvidencePanelStory() {
 
 // ----------------------------- NotificationsTray -------------------
 
+const NOTIFICATIONS_SEED: NotificationItem[] = [
+  {
+    id: "n1",
+    title: "Approval requested",
+    detail: "Compensation Q4 cycle — 3 proposals waiting",
+    at: new Date(Date.now() - 5 * 60_000),
+    read: false,
+    tone: "warning",
+    action: { label: "Review now", onClick: () => alert("review") },
+  },
+  {
+    id: "n2",
+    title: "Hiring plan v3 was approved",
+    detail: "By Grace Hopper",
+    at: new Date(Date.now() - 42 * 60_000),
+    read: false,
+    tone: "success",
+  },
+  {
+    id: "n3",
+    title: "A pay-equity flag was dismissed",
+    at: new Date(Date.now() - 3 * 3_600_000),
+    read: true,
+    tone: "info",
+  },
+];
+
 export function NotificationsTrayStory() {
-  const [items, setItems] = useState<NotificationItem[]>([
-    {
-      id: "n1",
-      title: "Approval requested",
-      detail: "Compensation Q4 cycle — 3 proposals waiting",
-      at: new Date(Date.now() - 5 * 60_000),
-      read: false,
-      tone: "warning",
-      action: { label: "Review now", onClick: () => alert("review") },
-    },
-    {
-      id: "n2",
-      title: "Hiring plan v3 was approved",
-      detail: "By Grace Hopper",
-      at: new Date(Date.now() - 42 * 60_000),
-      read: false,
-      tone: "success",
-    },
-    {
-      id: "n3",
-      title: "A pay-equity flag was dismissed",
-      at: new Date(Date.now() - 3 * 3_600_000),
-      read: true,
-      tone: "info",
-    },
-  ]);
+  const [items, setItems] = useState<NotificationItem[]>(NOTIFICATIONS_SEED);
   return (
     <StoryPanel
       title="NotificationsTray"

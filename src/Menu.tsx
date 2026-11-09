@@ -47,7 +47,7 @@ function toAntItems(items: MenuItem[], onSelect: (id: string) => void): AntMenuP
 
 export function Menu({ items, onSelect, align = "end", trigger }: MenuProps) {
   const [open, setOpen] = useState(false);
-  const toggle = (_e: MouseEvent<HTMLElement>) => setOpen((v) => !v);
+  const toggle = () => setOpen((v) => !v);
   return (
     <Dropdown
       open={open}

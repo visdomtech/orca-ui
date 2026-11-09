@@ -11,6 +11,14 @@ export interface TextInputProps extends Omit<AntInputProps, "size" | "status"> {
   inputRef?: Ref<HTMLInputElement>;
 }
 
+function assignRef(ref: Ref<HTMLInputElement> | undefined, el: HTMLInputElement | null) {
+  if (typeof ref === "function") {
+    ref(el);
+  } else if (ref && typeof ref === "object") {
+    (ref as { current: HTMLInputElement | null }).current = el;
+  }
+}
+
 export function TextInput({
   label,
   hint,
@@ -21,11 +29,7 @@ export function TextInput({
   ...rest
 }: TextInputProps) {
   const antRef = (node: InputRef | null) => {
-    if (typeof inputRef === "function") {
-      inputRef(node?.input ?? null);
-    } else if (inputRef && typeof inputRef === "object") {
-      (inputRef as { current: HTMLInputElement | null }).current = node?.input ?? null;
-    }
+    assignRef(inputRef, node?.input ?? null);
   };
 
   const input = (

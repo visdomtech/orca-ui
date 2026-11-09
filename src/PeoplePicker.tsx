@@ -94,18 +94,9 @@ export function PeoplePicker({
   debounceMs = 180,
 }: PeoplePickerProps) {
   const { setQuery, options, loading } = useAsyncSearch(source, debounceMs);
-  const [cache, setCache] = useState<Record<string, UserRef>>({});
-
-  useEffect(() => {
-    if (value) setCache((c) => ({ ...c, [value.id]: value }));
-  }, [value]);
-
-  for (const o of options) {
-    if (!cache[o.id]) setCache((c) => ({ ...c, [o.id]: o }));
-  }
 
   const antOptions = useMemo(
-    () => options.map((o) => ({ value: o.id, label: <OptionLabel user={o} />, user: o })),
+    () => options.map((o) => ({ value: o.id, label: <OptionLabel user={o} /> })),
     [options],
   );
 
@@ -114,7 +105,12 @@ export function PeoplePicker({
       showSearch
       value={value?.id}
       onSearch={setQuery}
-      onChange={(id) => onChange(id ? cache[id] ?? null : null)}
+      onChange={(id) => {
+        if (!id) return onChange(null);
+        if (value?.id === id) return;
+        const picked = options.find((o) => o.id === id) ?? null;
+        onChange(picked);
+      }}
       onClear={() => onChange(null)}
       allowClear
       disabled={disabled}
@@ -123,11 +119,7 @@ export function PeoplePicker({
       filterOption={false}
       notFoundContent={loading ? <Spin size="small" /> : "Type to search people"}
       options={antOptions}
-      optionLabelProp="user"
-      labelRender={(labelProps) => {
-        const user = cache[String(labelProps.value)];
-        return user ? <OptionLabel user={user} /> : labelProps.label;
-      }}
+      labelRender={(labelProps) => (value ? <OptionLabel user={value} /> : labelProps.label)}
       style={{ width: "100%" }}
     />
   );
@@ -159,17 +151,6 @@ export function PeoplePickerMulti({
   debounceMs = 180,
 }: PeoplePickerMultiProps) {
   const { setQuery, options, loading } = useAsyncSearch(source, debounceMs);
-  const [cache, setCache] = useState<Record<string, UserRef>>({});
-
-  useEffect(() => {
-    const next: Record<string, UserRef> = {};
-    for (const u of value) next[u.id] = u;
-    setCache((c) => ({ ...c, ...next }));
-  }, [value]);
-
-  for (const o of options) {
-    if (!cache[o.id]) setCache((c) => ({ ...c, [o.id]: o }));
-  }
 
   const selectedIds = useMemo(() => new Set(value.map((u) => u.id)), [value]);
   const antOptions = useMemo(
@@ -189,7 +170,9 @@ export function PeoplePickerMulti({
       onSearch={setQuery}
       onChange={(ids) => {
         if (atMax && ids.length > value.length) return;
-        const next = ids.map((id) => cache[id]).filter(Boolean) as UserRef[];
+        const next = ids
+          .map((id) => value.find((u) => u.id === id) ?? options.find((o) => o.id === id))
+          .filter(Boolean) as UserRef[];
         onChange(next);
       }}
       disabled={disabled}

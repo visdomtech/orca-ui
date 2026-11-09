@@ -1,5 +1,5 @@
 import { DownOutlined, RightOutlined, CalendarOutlined } from "@ant-design/icons";
-import { Button, Card, Space, theme } from "antd";
+import { Card, Space, theme } from "antd";
 import { useState, type ReactNode } from "react";
 
 import { Avatar } from "./Avatar";
