@@ -1,4 +1,4 @@
-import { Tag } from "antd";
+import { Chip, type ChipTone } from "./Chip";
 
 export type StatusPillTone = "success" | "warning" | "error" | "info" | "neutral";
 
@@ -7,18 +7,18 @@ export interface StatusPillProps {
   label: string;
 }
 
-const TONE_MAP: Record<StatusPillTone, string> = {
+const TONE_MAP: Record<StatusPillTone, ChipTone> = {
   success: "success",
   warning: "warning",
-  error: "error",
-  info: "processing",
-  neutral: "default",
+  error: "danger",
+  info: "info",
+  neutral: "neutral",
 };
 
 export function StatusPill({ tone, label }: StatusPillProps) {
   return (
-    <Tag color={TONE_MAP[tone]} style={{ borderRadius: 999, fontWeight: 600, margin: 0 }} bordered>
+    <Chip tone={TONE_MAP[tone]} variant="dot" size="sm">
       {label}
-    </Tag>
+    </Chip>
   );
 }

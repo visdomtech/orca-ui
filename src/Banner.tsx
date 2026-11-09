@@ -1,5 +1,14 @@
-import { Alert } from "antd";
+import {
+  CheckCircleOutlined,
+  CloseOutlined,
+  ExclamationCircleOutlined,
+  InfoCircleOutlined,
+  RightOutlined,
+  WarningOutlined,
+} from "@ant-design/icons";
 import { useState, type ReactNode } from "react";
+
+import { LIGHT_SURFACE, LIGHT_TONES, type Tone } from "./palette";
 
 export type BannerTone = "info" | "success" | "warning" | "danger" | "soft";
 
@@ -12,28 +21,91 @@ export interface BannerProps {
   onDismiss?: () => void;
 }
 
-const TONE_TO_ANT: Record<BannerTone, "info" | "success" | "warning" | "error"> = {
+const BANNER_TO_PALETTE: Record<BannerTone, Tone | "soft"> = {
   info: "info",
   success: "success",
   warning: "warning",
-  danger: "error",
-  soft: "info",
+  danger: "danger",
+  soft: "soft",
 };
 
+const DEFAULT_ICONS: Record<BannerTone, ReactNode> = {
+  info: <InfoCircleOutlined />,
+  success: <CheckCircleOutlined />,
+  warning: <WarningOutlined />,
+  danger: <ExclamationCircleOutlined />,
+  soft: <InfoCircleOutlined />,
+};
+
+function resolveColors(tone: BannerTone) {
+  const key = BANNER_TO_PALETTE[tone];
+  if (key === "soft") {
+    return {
+      background: LIGHT_SURFACE.surface,
+      color: LIGHT_SURFACE.ink,
+      border: `1px solid ${LIGHT_SURFACE.line}`,
+      stripeColor: LIGHT_TONES.neutral.dot,
+    };
+  }
+  const p = LIGHT_TONES[key];
+  return {
+    background: p.tint,
+    color: p.fg,
+    border: `1px solid transparent`,
+    stripeColor: p.dot,
+  };
+}
+
 export function Banner({ tone = "info", title, detail, action, icon, onDismiss }: BannerProps) {
-  const antType = TONE_TO_ANT[tone];
+  const { background, color, border, stripeColor } = resolveColors(tone);
   return (
-    <Alert
-      type={antType}
-      showIcon
-      icon={icon}
-      message={title}
-      description={detail}
-      action={action}
-      closable={Boolean(onDismiss)}
-      onClose={onDismiss}
-      style={tone === "soft" ? { background: "rgba(0,0,0,0.03)", borderColor: "rgba(0,0,0,0.1)" } : undefined}
-    />
+    <div
+      role="status"
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 12,
+        padding: "12px 16px",
+        borderRadius: 8,
+        border,
+        background,
+        color,
+        borderLeft: `4px solid ${stripeColor}`,
+      }}
+    >
+      <span style={{ marginTop: 2, color: stripeColor, display: "inline-flex", fontSize: 16 }}>
+        {icon ?? DEFAULT_ICONS[tone]}
+      </span>
+      <div style={{ minWidth: 0, flexGrow: 1 }}>
+        <div style={{ fontWeight: 600, fontSize: 14, lineHeight: 1.4 }}>{title}</div>
+        {detail && (
+          <div style={{ fontSize: 13, lineHeight: 1.5, marginTop: 2, opacity: 0.9 }}>{detail}</div>
+        )}
+      </div>
+      {action && <div style={{ display: "inline-flex", alignItems: "center" }}>{action}</div>}
+      {onDismiss && (
+        <button
+          type="button"
+          aria-label="Dismiss"
+          onClick={onDismiss}
+          style={{
+            all: "unset",
+            cursor: "pointer",
+            padding: 2,
+            marginLeft: 4,
+            borderRadius: 4,
+            color: "currentColor",
+            opacity: 0.55,
+            display: "inline-flex",
+            alignItems: "center",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.55")}
+        >
+          <CloseOutlined style={{ fontSize: 12 }} />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -64,18 +136,16 @@ export function CollapsibleBanner({
           setOpen((v) => !v);
         }
       }}
-      style={{ cursor: "pointer", userSelect: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
+      style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, userSelect: "none" }}
       aria-expanded={open}
     >
-      <span
+      <RightOutlined
         style={{
-          display: "inline-block",
+          fontSize: 10,
           transform: open ? "rotate(90deg)" : "none",
           transition: "transform 0.15s",
         }}
-      >
-        ▸
-      </span>
+      />
       {title}
     </span>
   );

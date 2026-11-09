@@ -30,9 +30,21 @@ export type { UserChipProps } from "./UserChip";
 export { UsersAccess } from "./UsersAccess";
 export type { UsersAccessProps, HttpClient } from "./UsersAccess";
 
+// Palette — canonical Orca Chip Palette tokens shared by every component.
+export {
+  LIGHT_TONES,
+  DARK_TONES,
+  LIGHT_SURFACE,
+  DARK_SURFACE,
+  FONT_STACK,
+  MONO_FONT_STACK,
+} from "./palette";
+export type { Tone, TonePalette } from "./palette";
+export { orcaAntdLightTheme } from "./antdTheme";
+
 // Bucket 1 — Core primitives
-export { Chip } from "./Chip";
-export type { ChipProps, ChipTone, ChipSize } from "./Chip";
+export { Chip, CHIP_PALETTE } from "./Chip";
+export type { ChipProps, ChipTone, ChipSize, ChipVariant } from "./Chip";
 export { Button } from "./Button";
 export type { ButtonProps, ButtonVariant, ButtonSize } from "./Button";
 export { Card } from "./Card";

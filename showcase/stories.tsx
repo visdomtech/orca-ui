@@ -242,7 +242,7 @@ export function ChipStory() {
         <Chip tone="success">Approved</Chip>
         <Chip tone="warning">Pending</Chip>
         <Chip tone="danger">Overdue</Chip>
-        <Chip tone="info">Info</Chip>
+        <Chip tone="info">Next due</Chip>
         <Chip tone="accent">Accent</Chip>
       </Variant>
       <Variant label="Size=sm">
