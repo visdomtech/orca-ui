@@ -27,7 +27,7 @@ export function Drawer({
   return (
     <AntDrawer
       open={open}
-      onClose={dismissible ? onClose : () => undefined}
+      onClose={dismissible ? onClose : undefined}
       title={title}
       placement={side}
       width={width}

@@ -2,6 +2,7 @@ import { theme } from "antd";
 import type { CSSProperties, ReactNode } from "react";
 
 import { Avatar } from "./Avatar";
+import type { Tone } from "./palette";
 import type { UserRef } from "./PeoplePicker";
 
 export interface AuditEntry {
@@ -11,7 +12,7 @@ export interface AuditEntry {
   action: ReactNode;
   target?: ReactNode;
   detail?: ReactNode;
-  tone?: "neutral" | "success" | "warning" | "danger" | "info" | "accent";
+  tone?: Tone;
 }
 
 export interface AuditLogProps {

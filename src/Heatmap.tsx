@@ -53,11 +53,12 @@ export function Heatmap({
   const span = resolvedMax - resolvedMin || 1;
 
   const colorFor = useMemo(() => {
-    const stops = scale?.thresholds;
+    const sorted = scale?.thresholds
+      ? [...scale.thresholds].sort((a, b) => a.at - b.at)
+      : null;
     const defaultBase = token.colorPrimary;
     return (v: number) => {
-      if (stops && stops.length > 0) {
-        const sorted = [...stops].sort((a, b) => a.at - b.at);
+      if (sorted && sorted.length > 0) {
         let pick = sorted[0];
         for (const s of sorted) if (v >= s.at) pick = s;
         return pick.color(token);

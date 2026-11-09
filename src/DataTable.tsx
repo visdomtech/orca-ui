@@ -1,6 +1,6 @@
 import { Empty, Table } from "antd";
 import type { ColumnType, SortOrder } from "antd/es/table/interface";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 export interface DataTableColumn<T> {
   id: string;
@@ -67,23 +67,28 @@ export function DataTable<T>({
   onSelectionChange,
   pagination,
 }: DataTableProps<T>) {
-  const antColumns: ColumnType<T>[] = columns.map((col) => {
-    let sortOrder: SortOrder | null | undefined;
-    if (col.sortable) {
-      sortOrder = sort?.id === col.id ? (sort.direction === "asc" ? "ascend" : "descend") : null;
-    }
-    return {
-      key: col.id,
-      title: col.header,
-      align: col.align,
-      width: col.width,
-      sorter: col.sortable ? true : undefined,
-      sortOrder,
-      sortDirections: ["ascend", "descend"] as SortOrder[],
-      showSorterTooltip: false,
-      render: (_: unknown, row: T) => col.render(row),
-    };
-  });
+  const antColumns = useMemo<ColumnType<T>[]>(
+    () =>
+      columns.map((col) => {
+        let sortOrder: SortOrder | null | undefined;
+        if (col.sortable) {
+          sortOrder =
+            sort?.id === col.id ? (sort.direction === "asc" ? "ascend" : "descend") : null;
+        }
+        return {
+          key: col.id,
+          title: col.header,
+          align: col.align,
+          width: col.width,
+          sorter: col.sortable ? true : undefined,
+          sortOrder,
+          sortDirections: ["ascend", "descend"] as SortOrder[],
+          showSorterTooltip: false,
+          render: (_: unknown, row: T) => col.render(row),
+        };
+      }),
+    [columns, sort],
+  );
 
   return (
     <Table<T>

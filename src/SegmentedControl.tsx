@@ -25,6 +25,7 @@ export function SegmentedControl<V extends string = string>({
   onChange,
   size = "md",
   fullWidth,
+  "aria-label": ariaLabel,
 }: SegmentedControlProps<V>) {
   return (
     <Segmented<V>
@@ -32,6 +33,7 @@ export function SegmentedControl<V extends string = string>({
       onChange={(v) => onChange(v as V)}
       size={size === "sm" ? "small" : "middle"}
       block={fullWidth}
+      aria-label={ariaLabel}
       options={options.map((o) => ({
         value: o.value,
         disabled: o.disabled,

@@ -1,5 +1,5 @@
 import { theme } from "antd";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import { toneColor, type ChartTone } from "./_chartTones";
 
@@ -22,9 +22,7 @@ export interface MeterBarProps {
   showScale?: boolean;
 }
 
-function activeTone(value: number, thresholds?: MeterThreshold[]): ChartTone {
-  if (!thresholds || thresholds.length === 0) return "accent";
-  const sorted = [...thresholds].sort((a, b) => a.at - b.at);
+function pickTone(value: number, sorted: MeterThreshold[]): ChartTone {
   let pick = sorted[0];
   for (const t of sorted) if (value >= t.at) pick = t;
   return pick.tone;
@@ -45,7 +43,12 @@ export function MeterBar({
   const { token } = theme.useToken();
   const span = max - min || 1;
   const pct = Math.max(0, Math.min(1, (value - min) / span));
-  const resolvedTone = tone ?? activeTone(value, thresholds);
+  const sortedThresholds = useMemo(
+    () => (thresholds ? [...thresholds].sort((a, b) => a.at - b.at) : []),
+    [thresholds],
+  );
+  const resolvedTone =
+    tone ?? (sortedThresholds.length > 0 ? pickTone(value, sortedThresholds) : "accent");
   const color = toneColor(token, resolvedTone);
   const targetLeft = target !== undefined ? ((target - min) / span) * 100 : null;
 

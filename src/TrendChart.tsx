@@ -68,8 +68,10 @@ export function TrendChart({
       }
     }
     const allY: number[] = series.flatMap((s) => s.points.map((p) => p.y));
-    const yMin = Math.min(0, ...allY);
-    const yMax = Math.max(...allY, target ?? -Infinity);
+    const yMin = allY.length > 0 ? Math.min(0, ...allY) : 0;
+    const yMax = allY.length > 0 || target !== undefined
+      ? Math.max(target ?? -Infinity, ...allY)
+      : 1;
     const columnFor = (x: number | string) => allX.findIndex((v) => toKey(v) === toKey(x));
     return { xs: allX, ys: allY, yMin, yMax, columnFor };
   }, [series, target]);
