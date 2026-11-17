@@ -5,11 +5,10 @@
     "": {
       "name": "@doublefin/orca-ui",
       "dependencies": {
-        "@ant-design/icons": "^6.3.4",
-        "antd": "^6.6.8",
         "dayjs": "^1.11.23",
       },
       "devDependencies": {
+        "@ant-design/icons": "^6.3.4",
         "@emotion/react": "^11.14.0",
         "@emotion/styled": "^11.14.1",
         "@mui/icons-material": "^9",
@@ -21,6 +20,7 @@
         "@types/react-dom": "^19.0.0",
         "@vitejs/plugin-react": "^5.0.0",
         "@xyflow/react": "^12.11.2",
+        "antd": "^6.6.8",
         "eslint": "^10.7.0",
         "eslint-plugin-react-hooks": "^7.1.1",
         "eslint-plugin-react-refresh": "^0.5.3",
@@ -40,12 +40,14 @@
         "@mui/icons-material": "^9",
         "@mui/material": "^9",
         "@tanstack/react-query": "^5",
+        "@xyflow/react": "^12",
         "antd": "^6",
         "react": "^18 || ^19",
         "react-dom": "^18 || ^19",
         "react-router": "^7 || ^8",
       },
       "optionalPeers": [
+        "@xyflow/react",
         "react-router",
       ],
     },
