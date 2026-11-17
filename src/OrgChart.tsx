@@ -54,10 +54,14 @@ export interface OrgChartProps {
   onNodeClick?: (id: string) => void;
   /** Loading state — shows a spinner. */
   loading?: boolean;
-  /** Error state — shows the fallback empty state with "Failed to load". */
-  error?: boolean;
+  /** Error state. Pass `true` for the default "failed to load" copy, an
+   *  Error (the message is rendered as the description), or any ReactNode
+   *  for a fully custom banner. */
+  error?: boolean | Error | ReactNode;
   /** Custom empty-state content shown when `nodes` is empty. */
   emptyState?: ReactNode;
+  /** Custom error-state content; overrides the default EmptyState render. */
+  errorState?: ReactNode;
   /** Container height. Defaults to `calc(100vh - 240px)` with min 400px. */
   height?: string | number;
   /** Starting collapsed depth. 0 (default) = collapse everything. */
@@ -78,7 +82,11 @@ function defaultColor(key: string): string {
   if (!key) return "#94a3b8";
   let h = 0;
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
-  return DEFAULT_PALETTE[Math.abs(h) % DEFAULT_PALETTE.length];
+  // `>>> 0` coerces to uint32 so Math.abs doesn't return a negative for the
+  // INT32_MIN hash (`Math.abs(-2147483648) === -2147483648`), which would
+  // produce an undefined palette index and a literal "undefined" border color.
+  const idx = (h >>> 0) % DEFAULT_PALETTE.length;
+  return DEFAULT_PALETTE[idx];
 }
 
 // Scoped CSS for hover transitions on the node cards and react-flow chrome.
@@ -557,6 +565,7 @@ function OrgChartInner({
   loading,
   error,
   emptyState,
+  errorState,
   height = "calc(100vh - 240px)",
   initialCollapsedDepth = 0,
   getNodeColor,
@@ -598,14 +607,16 @@ function OrgChartInner({
 
   const toggleCollapse = useCallback(
     (code: string) => {
-      const next = new Set(collapsed);
-      const wasCollapsed = next.has(code);
-      if (wasCollapsed) next.delete(code);
-      else next.add(code);
-      setCollapsedSet(next);
-
       const depth = nodeDepths.get(code);
-      const nowCollapsed = next.has(code);
+      let nowCollapsed = false;
+      setCollapsedSet((prev) => {
+        const base = prev ?? initialCollapsed(nodes, initialCollapsedDepth);
+        const next = new Set(base);
+        if (next.has(code)) next.delete(code);
+        else next.add(code);
+        nowCollapsed = next.has(code);
+        return next;
+      });
       setDepthFocus((prev) => {
         const df = new Map(prev);
         if (depth === undefined) return df;
@@ -618,7 +629,7 @@ function OrgChartInner({
         return df;
       });
     },
-    [collapsed, nodeDepths],
+    [nodeDepths, nodes, initialCollapsedDepth],
   );
 
   const focusPath = useMemo((): Set<string> => {
@@ -732,11 +743,21 @@ function OrgChartInner({
   }
 
   if (error) {
+    if (errorState) return <>{errorState}</>;
+    // `error === true`: default copy. `error instanceof Error`: use .message
+    // as the description. Any other ReactNode: render directly.
+    if (error !== true && !(error instanceof Error)) {
+      return <>{error}</>;
+    }
+    const description =
+      error instanceof Error
+        ? error.message
+        : "An error occurred while loading the org chart. Please try again.";
     return (
       <EmptyState
         icon={<ApartmentOutlined style={{ fontSize: 48 }} />}
         title="Failed to load org chart"
-        description="An error occurred while loading the org chart. Please try again."
+        description={description}
       />
     );
   }
