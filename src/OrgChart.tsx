@@ -45,7 +45,14 @@ import {
 export type { OrgChartNodeInput } from "./orgChartLayout";
 
 export interface OrgChartProps {
-  /** Flat parent-linked node list. */
+  /** Flat parent-linked node list.
+   *
+   *  Performance: this component derives several memoized indexes from
+   *  `nodes` (id map, subtree sizes, depths, collapsed set, layout). If the
+   *  caller passes a fresh array reference on every render (e.g.
+   *  `nodes={data.map(toNode)}` inline in JSX), every parent re-render will
+   *  invalidate the entire chain. Keep `nodes` stable via `useMemo` or a
+   *  parent-owned state slice. */
   nodes: OrgChartNodeInput[];
   /** Case-insensitive search query — matching nodes get a highlight ring. */
   search?: string;
