@@ -345,6 +345,20 @@ export function buildOrgChart(
     const p = n.parentId;
     if (p && !nodeMap.has(p)) externalIds.add(p);
   }
+  // Any node whose original parent lives in `externalIds` was tentatively
+  // added to `roots` above (because the parent wasn't in `nodeMap` at the
+  // time). Now that we're injecting the pseudo-parent, pull those adoptees
+  // back out of the root list so they don't get laid out twice and so the
+  // pseudo-parent actually emits edges to them.
+  const adoptedByPseudo = new Set<string>();
+  for (const node of nodes) {
+    if (node.parentId && externalIds.has(node.parentId)) {
+      adoptedByPseudo.add(node.id);
+    }
+  }
+  for (let i = roots.length - 1; i >= 0; i--) {
+    if (adoptedByPseudo.has(roots[i])) roots.splice(i, 1);
+  }
   for (const extId of externalIds) {
     if (!nodeMap.has(extId)) {
       const pseudo: OrgChartNodeInput = {
