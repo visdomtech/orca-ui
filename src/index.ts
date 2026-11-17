@@ -170,3 +170,17 @@ export {
   DEFAULT_AUDIT_CRITERIA,
   CONCERN_VALUES,
 } from "./roleAuditPrompt";
+
+// OrgChart ships via a subpath export (`@doublefin/orca-ui/org-chart`) so
+// consumers who don't need it don't pay for `@xyflow/react` resolution or
+// its stylesheet. See package.json#/exports."./org-chart".
+
+// Bucket 7 — Heavy workflow components
+export { CommentThread, useCommentThread } from "./CommentThread";
+export type {
+  CommentThreadProps,
+  Comment,
+  CommentThreadDraft,
+  UseCommentThreadOptions,
+  UseCommentThreadResult,
+} from "./CommentThread";

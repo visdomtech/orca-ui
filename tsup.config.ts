@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.ts", "src/roleAuditPrompt.ts"],
+  entry: ["src/index.ts", "src/roleAuditPrompt.ts", "src/OrgChart.tsx"],
   format: ["esm"],
   dts: true,
   treeshake: true,
@@ -18,6 +18,7 @@ export default defineConfig({
     "@emotion/react",
     "@emotion/styled",
     "@tanstack/react-query",
+    "@xyflow/react",
   ],
   injectStyle: true,
   sourcemap: true,

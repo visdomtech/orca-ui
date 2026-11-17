@@ -17,6 +17,10 @@
     "./role-audit-prompt": {
       "types": "./dist/roleAuditPrompt.d.ts",
       "import": "./dist/roleAuditPrompt.js"
+    },
+    "./org-chart": {
+      "types": "./dist/OrgChart.d.ts",
+      "import": "./dist/OrgChart.js"
     }
   },
   "files": [
@@ -25,10 +29,11 @@
   "scripts": {
     "build": "tailwindcss -i src/styles.css -o src/_compiled.css --minify && tsup",
     "lint": "eslint .",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "showcase": "vite --config showcase/vite.config.ts",
     "showcase:build": "SHOWCASE_DEPLOY=docs vite build --config showcase/vite.config.ts",
-    "prepublishOnly": "bun run typecheck && bun run build"
+    "prepublishOnly": "bun run typecheck && bun run test && bun run build"
   },
   "peerDependencies": {
     "antd": "^6",
@@ -38,6 +43,7 @@
     "@emotion/react": "^11",
     "@emotion/styled": "^11",
     "@tanstack/react-query": "^5",
+    "@xyflow/react": "^12",
     "react": "^18 || ^19",
     "react-dom": "^18 || ^19",
     "react-router": "^7 || ^8"
@@ -45,9 +51,13 @@
   "peerDependenciesMeta": {
     "react-router": {
       "optional": true
+    },
+    "@xyflow/react": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@ant-design/icons": "^6.3.4",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^9",
@@ -58,6 +68,8 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "@xyflow/react": "^12.11.2",
+    "antd": "^6.6.8",
     "eslint": "^10.7.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
@@ -68,11 +80,10 @@
     "tsup": "^8",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.65.0",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "vitest": "^5.1.0"
   },
   "dependencies": {
-    "@ant-design/icons": "^6.3.4",
-    "antd": "^6.6.8",
     "dayjs": "^1.11.23"
   }
 }

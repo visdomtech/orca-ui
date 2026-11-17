@@ -10,7 +10,8 @@
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {
-      "@orca-ui": ["../src/index.ts"]
+      "@orca-ui": ["../src/index.ts"],
+      "@orca-ui/org-chart": ["../src/OrgChart.tsx"]
     }
   },
   "include": ["."]

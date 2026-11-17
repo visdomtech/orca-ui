@@ -11,6 +11,9 @@ export default defineConfig({
   server: { port: 5178, open: false },
   resolve: {
     alias: {
+      // Order matters: more specific subpath first so "@orca-ui" doesn't
+      // shadow "@orca-ui/org-chart".
+      "@orca-ui/org-chart": fileURLToPath(new URL("../src/OrgChart.tsx", import.meta.url)),
       "@orca-ui": fileURLToPath(new URL("../src", import.meta.url)),
     },
   },
