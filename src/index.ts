@@ -170,3 +170,17 @@ export {
   DEFAULT_AUDIT_CRITERIA,
   CONCERN_VALUES,
 } from "./roleAuditPrompt";
+
+export { OrgChart } from "./OrgChart";
+export type { OrgChartProps, OrgChartNodeInput } from "./OrgChart";
+
+// Bucket 7 — Heavy workflow components
+export { CommentThread, useCommentThread } from "./CommentThread";
+export type {
+  CommentThreadProps,
+  Comment,
+  CommentThreadDraft,
+  EntityRef,
+  UseCommentThreadOptions,
+  UseCommentThreadResult,
+} from "./CommentThread";

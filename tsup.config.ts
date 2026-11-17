@@ -18,6 +18,7 @@ export default defineConfig({
     "@emotion/react",
     "@emotion/styled",
     "@tanstack/react-query",
+    "@xyflow/react",
   ],
   injectStyle: true,
   sourcemap: true,

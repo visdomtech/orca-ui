@@ -20,6 +20,7 @@ import {
   Chip,
   CohortCurve,
   CollapsibleBanner,
+  CommentThread,
   DashboardShell,
   DataTable,
   DateRangePicker,
@@ -48,6 +49,7 @@ import {
   MonthYearPicker,
   NotificationsTray,
   NumberInput,
+  OrgChart,
   PageHeader,
   PeoplePicker,
   PeoplePickerMulti,
@@ -78,7 +80,9 @@ import {
   type EmployeeDrawerSection,
   type FilterSpec,
   type FilterState,
+  type Comment,
   type NotificationItem,
+  type OrgChartNodeInput,
   type PeopleSource,
   type SortState,
   type StatusPillTone,
@@ -1740,6 +1744,121 @@ export function NotificationsTrayStory() {
   );
 }
 
+// ----------------------------- CommentThread ----------------------
+
+const COMMENT_SEED: Comment[] = [
+  {
+    id: "c1",
+    author: DIRECTORY[0],
+    body: "Q3 attrition on the Platform team spiked 3 points above forecast — worth flagging in the Monday review.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
+  },
+  {
+    id: "c1-r1",
+    parentCommentId: "c1",
+    author: DIRECTORY[2],
+    body: "Agree. Most of it is the Riverside team — Grace is already running 1:1s. Pulling the data for Mon.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 22).toISOString(),
+  },
+  {
+    id: "c1-r2",
+    parentCommentId: "c1",
+    author: DIRECTORY[4],
+    body: "Loop me in — I want to see the compa-ratio before the review.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
+  },
+  {
+    id: "c2",
+    author: DIRECTORY[1],
+    body: "Representation screen is clean this period. No corrective action needed.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
+    resolvedAt: new Date(Date.now() - 1000 * 60 * 40).toISOString(),
+  },
+];
+
+const CURRENT_ACTOR = DIRECTORY[3];
+
+export function CommentThreadStory() {
+  const [comments, setComments] = useState<Comment[]>(COMMENT_SEED);
+
+  const makeId = () =>
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? `c-${crypto.randomUUID()}`
+      : `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const onPost = async (draft: { body: string; parentCommentId?: string }) => {
+    await new Promise((r) => setTimeout(r, 180));
+    setComments((xs) => [
+      ...xs,
+      {
+        id: makeId(),
+        author: CURRENT_ACTOR,
+        body: draft.body,
+        parentCommentId: draft.parentCommentId,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+  };
+
+  const onResolve = async (id: string) => {
+    setComments((xs) =>
+      xs.map((c) => (c.id === id ? { ...c, resolvedAt: new Date().toISOString() } : c)),
+    );
+  };
+
+  const onUnresolve = async (id: string) => {
+    setComments((xs) => xs.map((c) => (c.id === id ? { ...c, resolvedAt: null } : c)));
+  };
+
+  const onDelete = async (id: string) => {
+    setComments((xs) => xs.filter((c) => c.id !== id && c.parentCommentId !== id));
+  };
+
+  return (
+    <StoryPanel
+      title="CommentThread"
+      description="Bucket 7 — Discussion threads pinned to any entity. Prop-driven (pass `comments` + `onPost`) or use the paired `useCommentThread` hook for optimistic state. One level of replies, resolve/delete, keyboard shortcut (⌘/Ctrl+Enter)."
+    >
+      <Variant label="Populated — one open thread + one resolved">
+        <div style={{ width: 640 }}>
+          <CommentThread
+            entityRef={{ objectType: "page", objectId: "overview" }}
+            comments={comments}
+            currentActor={CURRENT_ACTOR}
+            onPost={onPost}
+            onResolve={onResolve}
+            onUnresolve={onUnresolve}
+            onDelete={onDelete}
+          />
+        </div>
+      </Variant>
+      <Variant label="Empty state">
+        <div style={{ width: 640 }}>
+          <CommentThread
+            entityRef={{ objectType: "metric", objectId: "turnover" }}
+            comments={[]}
+            currentActor={CURRENT_ACTOR}
+            onPost={async () => undefined}
+            title="Discussion — Turnover"
+          />
+        </div>
+      </Variant>
+      <Variant label="Read-only (no composer, no actions)">
+        <div style={{ width: 640 }}>
+          <CommentThread
+            entityRef={{ objectType: "insight", objectId: "ins-01" }}
+            comments={COMMENT_SEED.slice(0, 2)}
+            currentActor={CURRENT_ACTOR}
+            onPost={async () => undefined}
+            readOnly
+            title="Discussion — Archived"
+          />
+        </div>
+      </Variant>
+    </StoryPanel>
+  );
+}
+
 // ----------------------------- EmployeeDrawer ----------------------
 
 export function EmployeeDrawerStory() {
@@ -2183,6 +2302,84 @@ export function GlassCardStory() {
   );
 }
 
+// ----------------------------- OrgChart ----------------------------
+
+const ORG_CHART_SAMPLE: OrgChartNodeInput[] = [
+  { id: "E1", firstName: "Aida", lastName: "Phillips", title: "CEO", groupKey: "Executive", directChildCount: 7 },
+  { id: "E2", firstName: "Tony", lastName: "Morgan", title: "VP, Chief of Staff", groupKey: "HR", parentId: "E1", directChildCount: 3 },
+  { id: "E3", firstName: "Rhiannon", lastName: "Thackeray", title: "General Counsel", groupKey: "Legal", parentId: "E1", directChildCount: 1 },
+  { id: "E4", firstName: "Gilbert", lastName: "Howard", title: "Chief Product Officer", groupKey: "Product", parentId: "E1", directChildCount: 2 },
+  { id: "E5", firstName: "Alford", lastName: "Montgomery", title: "Chief Financial Officer", groupKey: "Finance", parentId: "E1", directChildCount: 1 },
+  { id: "E6", firstName: "Gerald", lastName: "Harden", title: "EVP Marketing", groupKey: "Marketing", parentId: "E1", directChildCount: 0 },
+  { id: "E7", firstName: "Soren", lastName: "Stavrakis", title: "EVP Business Dev", groupKey: "Marketing", parentId: "E1", directChildCount: 0 },
+  { id: "E8", firstName: "Dashiell", lastName: "Whitcombe", title: "VP Operations", groupKey: "HR", parentId: "E1", directChildCount: 0 },
+
+  { id: "E10", firstName: "Brianna", lastName: "Ellis", title: "Talent Acquisition Mgr", groupKey: "HR", parentId: "E2", directChildCount: 0 },
+  { id: "E11", firstName: "Sindre", lastName: "Rasmussen", title: "Sr. Director, People", groupKey: "HR", parentId: "E2", directChildCount: 0 },
+  { id: "E12", firstName: "Kelli", lastName: "Thomas", title: "Associate PM", groupKey: "HR", parentId: "E2", directChildCount: 0 },
+
+  { id: "E20", firstName: "Charlie", lastName: "Perry", title: "VP Engineering", groupKey: "Engineering", parentId: "E4", directChildCount: 8 },
+  { id: "E21", firstName: "Emma", lastName: "Murray", title: "Director, Engineering", groupKey: "Engineering", parentId: "E4", directChildCount: 2 },
+
+  // Wide fan-out under Charlie to exercise the grid + column-chain layout.
+  { id: "E30", firstName: "Sean", lastName: "Steffen", title: "Sr. Director, Eng", groupKey: "Engineering", parentId: "E20", directChildCount: 1 },
+  { id: "E31", firstName: "Zeeshan", lastName: "Sule", title: "Chief Architect", groupKey: "Engineering", parentId: "E20", directChildCount: 0 },
+  { id: "E32", firstName: "Baek", lastName: "Jongsoo", title: "Sr. Manager, SE", groupKey: "Engineering", parentId: "E20", directChildCount: 0 },
+  { id: "E33", firstName: "Karoliina", lastName: "Kolkkala", title: "Manager, SE", groupKey: "Engineering", parentId: "E20", directChildCount: 0 },
+  { id: "E34", firstName: "Shangyu", lastName: "Ding", title: "Sr. Staff Engineer", groupKey: "Engineering", parentId: "E20", directChildCount: 0 },
+  { id: "E35", firstName: "Desirée", lastName: "Holmberg", title: "Sr. SWE II", groupKey: "Engineering", parentId: "E20", directChildCount: 0 },
+  { id: "E36", firstName: "Meiling", lastName: "Fu", title: "SWE, Web", groupKey: "Engineering", parentId: "E20", directChildCount: 0 },
+  { id: "E37", firstName: "Imad", lastName: "Eijkelboom", title: "Sr. SWE I", groupKey: "Engineering", parentId: "E20", directChildCount: 0 },
+
+  { id: "E40", firstName: "Kimberly", lastName: "Koury", title: "Tech Lead Mgr", groupKey: "Engineering", parentId: "E30", directChildCount: 0 },
+
+  // External parent: this employee reports to someone not in the list.
+  { id: "E99", firstName: "Nina", lastName: "Patel", title: "Vendor Liaison", groupKey: "External", parentId: "EXTERNAL-VEND", directChildCount: 0 },
+];
+
+export function OrgChartStory() {
+  const [search, setSearch] = useState("");
+  return (
+    <StoryPanel
+      title="OrgChart"
+      description="Flat node list with parent links → positioned React Flow chart. Collapsible, searchable, grid + column-chained edges for wide fan-outs, external pseudo-nodes for missing parents, sibling-focus dimming when a mid-tree node is expanded."
+    >
+      <Variant label='Small org (expand "Charlie Perry" to see the grid + column-chain)'>
+        <div style={{ width: "100%" }}>
+          <div style={{ marginBottom: 12, maxWidth: 320 }}>
+            <TextInput
+              placeholder="Search by name or id…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <OrgChart
+            nodes={ORG_CHART_SAMPLE}
+            search={search}
+            onNodeClick={(id) => alert(`Clicked ${id}`)}
+            height={560}
+          />
+        </div>
+      </Variant>
+      <Variant label="Loading">
+        <div style={{ width: "100%" }}>
+          <OrgChart nodes={[]} loading height={200} />
+        </div>
+      </Variant>
+      <Variant label="Error">
+        <div style={{ width: "100%" }}>
+          <OrgChart nodes={[]} error height={200} />
+        </div>
+      </Variant>
+      <Variant label="Empty">
+        <div style={{ width: "100%" }}>
+          <OrgChart nodes={[]} height={200} />
+        </div>
+      </Variant>
+    </StoryPanel>
+  );
+}
+
 // -------------------------- Story registry --------------------------
 
 export interface StoryEntry {
@@ -2228,6 +2425,7 @@ export const STORIES: StoryEntry[] = [
   { id: "cohort", label: "CohortCurve", group: "Data display", render: () => <CohortCurveStory /> },
   { id: "meter", label: "MeterBar / ProgressBar", group: "Data display", render: () => <MeterBarStory /> },
   { id: "datatable", label: "DataTable", group: "Data display", render: () => <DataTableStory /> },
+  { id: "orgchart", label: "OrgChart", group: "Data display", render: () => <OrgChartStory /> },
   // Bucket 4
   { id: "daterange", label: "DateRangePicker", group: "Forms", render: () => <DateRangePickerStory /> },
   { id: "monthyear", label: "MonthYearPicker", group: "Forms", render: () => <MonthYearPickerStory /> },
@@ -2241,6 +2439,8 @@ export const STORIES: StoryEntry[] = [
   { id: "evidence", label: "EvidencePanel", group: "Content", render: () => <EvidencePanelStory /> },
   { id: "notifs", label: "NotificationsTray", group: "Content", render: () => <NotificationsTrayStory /> },
   { id: "employee-drawer", label: "EmployeeDrawer", group: "Content", render: () => <EmployeeDrawerStory /> },
+  // Bucket 7 — Heavy workflow
+  { id: "comment-thread", label: "CommentThread", group: "Workflow", render: () => <CommentThreadStory /> },
   // Legacy — pre-existing orca-ui components
   { id: "statuspill", label: "StatusPill", group: "Legacy", render: () => <StatusPillStory /> },
   { id: "userchip", label: "UserChip", group: "Legacy", render: () => <UserChipStory /> },
