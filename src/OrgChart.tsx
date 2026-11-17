@@ -580,7 +580,11 @@ function OrgChartInner({
     [getNodeColor],
   );
 
-  const nodeIds = useMemo(() => new Set(nodes.map((n) => n.id)), [nodes]);
+  // Single id→node index shared across the memo chain below. Three separate
+  // consumers used to build their own `new Map(nodes.map(...))` — this is
+  // the same O(N) walk, three times.
+  const nodeMap = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+  const nodeIds = useMemo(() => new Set(nodeMap.keys()), [nodeMap]);
 
   // Derive pruned views of collapsedSet / depthFocus instead of pruning the
   // stored state in an effect — keeps reads consistent when `nodes` shrinks
@@ -644,7 +648,6 @@ function OrgChartInner({
     }
     if (!focusCode) return new Set<string>();
     const path = new Set<string>();
-    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
     let current: string | undefined = focusCode;
     while (current && nodeMap.has(current)) {
       path.add(current);
@@ -652,11 +655,10 @@ function OrgChartInner({
       current = mgr && nodeMap.has(mgr) ? mgr : undefined;
     }
     return path;
-  }, [nodes, effectiveDepthFocus]);
+  }, [nodes, nodeMap, effectiveDepthFocus]);
 
   const stacked = useMemo((): Set<string> => {
     if (focusPath.size === 0) return new Set<string>();
-    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
     const result = new Set<string>();
     for (const n of nodes) {
       const code = n.id;
@@ -668,11 +670,10 @@ function OrgChartInner({
       if (effectiveDepthFocus.has(depth)) result.add(code);
     }
     return result;
-  }, [nodes, focusPath, collapsed, nodeDepths, effectiveDepthFocus]);
+  }, [nodes, nodeMap, focusPath, collapsed, nodeDepths, effectiveDepthFocus]);
 
   const groupedStacked = useMemo((): Map<string, string[]> => {
     if (stacked.size === 0) return new Map();
-    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
     const groups = new Map<string, string[]>();
     for (const code of stacked) {
       const mgr = nodeMap.get(code)?.parentId;
@@ -683,7 +684,7 @@ function OrgChartInner({
       }
     }
     return groups;
-  }, [nodes, stacked]);
+  }, [nodeMap, stacked]);
 
   const layout = useMemo(() => {
     if (!nodes.length) return undefined;

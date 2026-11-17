@@ -109,6 +109,14 @@ export function buildOrgChart(
   const hiddenByCollapse = new Set<string>();
   const layoutNodes: LayoutNode[] = [];
   const layoutEdges: LayoutEdge[] = [];
+  // Memoize subtreeWidth per (code) within a single buildOrgChart call. The
+  // result depends on `collapsed` / `stacked` / `groupedStacked` (constant
+  // within this call) and on `visited` (mutates as layout runs). For
+  // tree-structured subtrees the visited filter is a no-op, so the cached
+  // value stays correct across the forest pass. Cycle-promoted nodes fetched
+  // first in Phase C are computed with the full `visited` and then cached —
+  // also correct. The cache turns a pathological O(N²) chain into O(N).
+  const widthCache = new Map<string, number>();
 
   function gridColumns(count: number): number {
     if (count < GRID_MIN_CHILDREN) return 1;
@@ -164,6 +172,14 @@ export function buildOrgChart(
   }
 
   function subtreeWidth(code: string, measuring?: Set<string>): number {
+    const cached = widthCache.get(code);
+    if (cached !== undefined) return cached;
+    const result = computeSubtreeWidth(code, measuring);
+    widthCache.set(code, result);
+    return result;
+  }
+
+  function computeSubtreeWidth(code: string, measuring?: Set<string>): number {
     if (collapsed.has(code)) return NODE_WIDTH;
     const w = stacked?.has(code) ? STACKED_WIDTH : NODE_WIDTH;
     const m = measuring ?? new Set<string>();
