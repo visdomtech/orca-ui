@@ -49,7 +49,6 @@ import {
   MonthYearPicker,
   NotificationsTray,
   NumberInput,
-  OrgChart,
   PageHeader,
   PeoplePicker,
   PeoplePickerMulti,
@@ -82,7 +81,6 @@ import {
   type FilterState,
   type Comment,
   type NotificationItem,
-  type OrgChartNodeInput,
   type PeopleSource,
   type SortState,
   type StatusPillTone,
@@ -91,6 +89,7 @@ import {
   type WizardStep,
   type WizardValidationState,
 } from "@orca-ui";
+import { OrgChart, type OrgChartNodeInput } from "@orca-ui/org-chart";
 
 import { StoryPanel, Variant } from "./StoryPanel";
 

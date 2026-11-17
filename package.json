@@ -17,6 +17,10 @@
     "./role-audit-prompt": {
       "types": "./dist/roleAuditPrompt.d.ts",
       "import": "./dist/roleAuditPrompt.js"
+    },
+    "./org-chart": {
+      "types": "./dist/OrgChart.d.ts",
+      "import": "./dist/OrgChart.js"
     }
   },
   "files": [

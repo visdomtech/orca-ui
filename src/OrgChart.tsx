@@ -40,9 +40,9 @@ import {
   computeNodeDepths,
   initialCollapsed,
   type OrgChartNodeInput,
-} from "./_orgChartLayout";
+} from "./orgChartLayout";
 
-export type { OrgChartNodeInput } from "./_orgChartLayout";
+export type { OrgChartNodeInput } from "./orgChartLayout";
 
 export interface OrgChartProps {
   /** Flat parent-linked node list. */

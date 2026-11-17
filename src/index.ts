@@ -171,8 +171,9 @@ export {
   CONCERN_VALUES,
 } from "./roleAuditPrompt";
 
-export { OrgChart } from "./OrgChart";
-export type { OrgChartProps, OrgChartNodeInput } from "./OrgChart";
+// OrgChart ships via a subpath export (`@doublefin/orca-ui/org-chart`) so
+// consumers who don't need it don't pay for `@xyflow/react` resolution or
+// its stylesheet. See package.json#/exports."./org-chart".
 
 // Bucket 7 — Heavy workflow components
 export { CommentThread, useCommentThread } from "./CommentThread";
