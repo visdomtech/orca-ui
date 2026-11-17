@@ -1,15 +1,12 @@
 # Changelog
 
-## [2.0.0](https://github.com/visdomtech/orca-ui/compare/v1.3.0...v2.0.0) (2026-11-17)
+## [1.4.0](https://github.com/visdomtech/orca-ui/compare/v1.3.0...v1.4.0) (2026-11-17)
 
-
-### ⚠ BREAKING CHANGES
-
-* import OrgChart from `@doublefin/orca-ui/org-chart` instead of `@doublefin/orca-ui`. OrgChartProps + OrgChartNodeInput move too.
 
 ### Features
 
 * add CommentThread and OrgChart components ([#24](https://github.com/visdomtech/orca-ui/issues/24)) ([3c30ed8](https://github.com/visdomtech/orca-ui/commit/3c30ed8a38533ab64756efea3e34a3cc11c80ecf))
+  * `OrgChart` ships as the subpath export `@doublefin/orca-ui/org-chart` so consumers who don't use it don't pull `@xyflow/react` or its stylesheet. No consumer-facing break — `OrgChart` was never in a published release before this one.
 
 ## [1.3.0](https://github.com/visdomtech/orca-ui/compare/v1.2.4...v1.3.0) (2026-11-09)
 
