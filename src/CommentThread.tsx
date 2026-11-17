@@ -14,7 +14,7 @@ import { Avatar } from "./Avatar";
 import { Button } from "./Button";
 import { Chip } from "./Chip";
 import { MeatballMenu, type MenuItem } from "./Menu";
-import type { PeopleSource, UserRef } from "./PeoplePicker";
+import type { UserRef } from "./PeoplePicker";
 import { TextArea } from "./TextArea";
 
 /**
@@ -28,15 +28,10 @@ import { TextArea } from "./TextArea";
  * Scope for v1 (keep this list honest):
  *   - Parent → one level of replies (no deeper nesting)
  *   - Resolve / unresolve / delete actions (gated by capability props)
- *   - Optional `mentionSource` wired through for future inline-@ picker; the
- *     current render does not yet parse @-mentions inline
- *   - No markdown / no reactions / no read receipts in this version
+ *   - No markdown / no reactions / no read receipts / no inline @-mentions
+ *     in this version (callers can still store `mentions` on the Comment
+ *     data; they just aren't rendered specially)
  */
-
-export interface EntityRef {
-  objectType: string;
-  objectId: string;
-}
 
 export interface Comment {
   id: string;
@@ -55,19 +50,18 @@ export interface CommentThreadDraft {
 }
 
 export interface CommentThreadProps {
-  entityRef: EntityRef;
   comments: Comment[];
   currentActor: UserRef;
   onPost: (draft: CommentThreadDraft) => Promise<void>;
   onResolve?: (commentId: string) => Promise<void>;
   onUnresolve?: (commentId: string) => Promise<void>;
   onDelete?: (commentId: string) => Promise<void>;
-  /** Reserved for the inline-@ picker; present on the API so callers can wire
-   *  it once and get richer mentions when v2 ships. */
-  mentionSource?: PeopleSource;
   loading?: boolean;
   posting?: boolean;
   readOnly?: boolean;
+  /** Surface fetch / mutation failures. Rendered as an inline banner above
+   *  the list. Accepts an Error (displays `.message`) or any ReactNode. */
+  error?: Error | ReactNode;
   emptyState?: ReactNode;
   title?: ReactNode;
   maxHeight?: number | string;
@@ -84,6 +78,7 @@ export function CommentThread({
   loading = false,
   posting = false,
   readOnly = false,
+  error,
   emptyState,
   title = "Discussion",
   maxHeight,
@@ -94,6 +89,7 @@ export function CommentThread({
   const [replyingTo, setReplyingTo] = useState<string | undefined>(undefined);
   const [replyDraft, setReplyDraft] = useState("");
   const [showingResolved, setShowingResolved] = useState(showResolved);
+  const [localError, setLocalError] = useState<Error | null>(null);
 
   const grouped = useMemo(() => groupByThread(comments), [comments]);
   const visibleGroups = showingResolved
@@ -101,14 +97,25 @@ export function CommentThread({
     : grouped.filter((g) => !g.parent.resolvedAt);
   const hiddenCount = grouped.length - visibleGroups.length;
 
+  // If the comments array no longer contains the parent the user is replying
+  // to (e.g. it was deleted by another tab / realtime update), treat the
+  // composer as closed — don't render it, don't let the draft get retargeted.
+  // We don't clear the underlying state in an effect (cascading render) —
+  // the next `onStartReply` will clear the draft anyway.
+  const effectiveReplyingTo =
+    replyingTo && comments.some((c) => c.id === replyingTo) ? replyingTo : undefined;
+
   const handlePostTop = async () => {
     const body = draft.trim();
     if (!body || posting || readOnly) return;
     try {
+      setLocalError(null);
       await onPost({ body });
       setDraft("");
-    } catch {
-      // Keep the draft so the user can retry without re-typing.
+    } catch (e) {
+      // Keep the draft so the user can retry without re-typing, but surface
+      // the failure so they know it didn't go through.
+      setLocalError(e instanceof Error ? e : new Error(String(e)));
     }
   };
 
@@ -116,13 +123,18 @@ export function CommentThread({
     const body = replyDraft.trim();
     if (!body || posting || readOnly) return;
     try {
+      setLocalError(null);
       await onPost({ body, parentCommentId });
       setReplyDraft("");
       setReplyingTo(undefined);
-    } catch {
-      // Keep the draft so the user can retry without re-typing.
+    } catch (e) {
+      setLocalError(e instanceof Error ? e : new Error(String(e)));
     }
   };
+
+  const displayError = error ?? localError;
+  const errorNode =
+    displayError instanceof Error ? displayError.message : displayError;
 
   const container: CSSProperties = {
     display: "flex",
@@ -169,6 +181,23 @@ export function CommentThread({
         )}
       </div>
 
+      {errorNode && (
+        <div
+          role="alert"
+          style={{
+            margin: "10px 16px 0",
+            padding: "8px 12px",
+            borderRadius: 6,
+            background: token.colorErrorBg,
+            border: `1px solid ${token.colorErrorBorder}`,
+            color: token.colorErrorText,
+            fontSize: 13,
+          }}
+        >
+          {errorNode}
+        </div>
+      )}
+
       {loading && comments.length === 0 ? (
         <div style={{ display: "flex", justifyContent: "center", padding: 32 }}>
           <Spin size="small" />
@@ -189,7 +218,7 @@ export function CommentThread({
               onDelete={onDelete}
               readOnly={readOnly}
               isLast={idx === visibleGroups.length - 1}
-              replyingTo={replyingTo}
+              replyingTo={effectiveReplyingTo}
               onStartReply={(id) => {
                 setReplyingTo(id);
                 setReplyDraft("");
@@ -398,9 +427,16 @@ function CommentRow({
   }
 
   const handleMenuSelect = (id: string) => {
-    if (id === "resolve" && onResolve) void onResolve(comment.id);
-    else if (id === "reopen" && onUnresolve) void onUnresolve(comment.id);
-    else if (id === "delete" && onDelete) void onDelete(comment.id);
+    // Swallow intentionally; consumer-level error UX is their call. We still
+    // surface the rejection to console.error so it doesn't become a silent
+    // unhandled-rejection in the browser.
+    const guard = (p: Promise<void> | undefined) =>
+      p?.catch((err: unknown) => {
+        console.error("CommentThread menu action failed", err);
+      });
+    if (id === "resolve" && onResolve) guard(onResolve(comment.id));
+    else if (id === "reopen" && onUnresolve) guard(onUnresolve(comment.id));
+    else if (id === "delete" && onDelete) guard(onDelete(comment.id));
   };
 
   return (
@@ -458,13 +494,30 @@ interface ThreadGroup {
 }
 
 function groupByThread(comments: Comment[]): ThreadGroup[] {
-  const parents = comments.filter((c) => !c.parentCommentId);
+  const parentIds = new Set<string>();
+  const parents: Comment[] = [];
+  for (const c of comments) {
+    if (!c.parentCommentId) {
+      parentIds.add(c.id);
+      parents.push(c);
+    }
+  }
   const repliesByParent = new Map<string, Comment[]>();
+  const orphans: string[] = [];
   for (const c of comments) {
     if (!c.parentCommentId) continue;
+    if (!parentIds.has(c.parentCommentId)) {
+      orphans.push(c.id);
+      continue;
+    }
     const arr = repliesByParent.get(c.parentCommentId) ?? [];
     arr.push(c);
     repliesByParent.set(c.parentCommentId, arr);
+  }
+  if (orphans.length > 0 && typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
+    console.warn(
+      `CommentThread: dropped ${orphans.length} reply/replies whose parent is not in the comments array: ${orphans.join(", ")}`,
+    );
   }
   parents.sort((a, b) => toTime(a.createdAt) - toTime(b.createdAt));
   for (const [, arr] of repliesByParent) {
@@ -499,13 +552,13 @@ function formatRelativeTime(d: string | Date): string {
 // ─── Headless state hook ──────────────────────────────────────────────────
 
 export interface UseCommentThreadOptions {
-  entityRef: EntityRef;
   fetch: () => Promise<Comment[]>;
   post: (draft: CommentThreadDraft) => Promise<Comment>;
   resolve?: (id: string) => Promise<void>;
   unresolve?: (id: string) => Promise<void>;
   remove?: (id: string) => Promise<void>;
-  /** Optional polling interval (ms). Omit for fetch-on-mount only. */
+  /** Optional polling interval (ms). Omit for fetch-on-mount only.
+   *  Values below 1000 ms are clamped to 1 s to avoid accidental API hammering. */
   pollMs?: number;
 }
 
@@ -525,17 +578,32 @@ export interface UseCommentThreadResult {
  * Headless comment-thread state: fetch, optimistic post, optimistic resolve /
  * unresolve / delete, optional polling. Consumers pass this straight into
  * `<CommentThread />` via `comments`, `onPost`, `onResolve`, `onUnresolve`,
- * `onDelete`, `loading`, `posting`.
+ * `onDelete`, `loading`, `posting`, `error`.
+ *
+ * Scoping: this hook is entity-agnostic — if the caller wires it to a
+ * different entity, it's their responsibility to re-mount the component (with
+ * a stable `key`) or close a new adapter set over the new entity id.
  */
 export function useCommentThread(opts: UseCommentThreadOptions): UseCommentThreadResult {
   const { fetch, post, resolve, unresolve, remove, pollMs } = opts;
-  // Pin the latest adapter callbacks so the polling / refresh loop below
-  // doesn't re-mount on every re-render just because the parent didn't memoize
-  // its lambdas.
+  // Pin the latest adapter callbacks in an effect (not during render — ref
+  // writes during render are unsafe under concurrent mode) so the memoized
+  // callbacks below can read the current adapters without re-registering.
   const adaptersRef = useRef({ fetch, post, resolve, unresolve, remove });
   useEffect(() => {
     adaptersRef.current = { fetch, post, resolve, unresolve, remove };
   });
+
+  // Mount flag + monotonic request id so late-returning adapters cannot
+  // overwrite newer state (unmount, racing poll vs. optimistic post, etc.).
+  const aliveRef = useRef(true);
+  const reqIdRef = useRef(0);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -543,21 +611,27 @@ export function useCommentThread(opts: UseCommentThreadOptions): UseCommentThrea
   const [error, setError] = useState<Error | null>(null);
 
   const refresh = useCallback(async () => {
+    const reqId = ++reqIdRef.current;
     try {
       const items = await adaptersRef.current.fetch();
+      if (!aliveRef.current || reqId !== reqIdRef.current) return;
       setComments(items);
       setError(null);
     } catch (e) {
+      if (!aliveRef.current || reqId !== reqIdRef.current) return;
       setError(e instanceof Error ? e : new Error(String(e)));
     } finally {
-      setLoading(false);
+      if (aliveRef.current && reqId === reqIdRef.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     void refresh();
-    if (!pollMs) return;
-    const id = window.setInterval(refresh, pollMs);
+    // No interval when polling disabled; `typeof window === "undefined"`
+    // guards SSR / Node environments where `window.setInterval` is absent.
+    if (!pollMs || typeof window === "undefined") return;
+    const clamped = Math.max(1000, pollMs);
+    const id = window.setInterval(refresh, clamped);
     return () => window.clearInterval(id);
   }, [refresh, pollMs]);
 
@@ -565,39 +639,66 @@ export function useCommentThread(opts: UseCommentThreadOptions): UseCommentThrea
     setPosting(true);
     try {
       const created = await adaptersRef.current.post(draft);
+      if (!aliveRef.current) return;
       setComments((prev) => [...prev, created]);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e : new Error(String(e)));
+      if (aliveRef.current) {
+        setError(e instanceof Error ? e : new Error(String(e)));
+      }
       throw e;
     } finally {
-      setPosting(false);
+      if (aliveRef.current) setPosting(false);
     }
   }, []);
 
   const resolveCb = useCallback(async (id: string) => {
     const impl = adaptersRef.current.resolve;
     if (!impl) return;
-    await impl(id);
-    setComments((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, resolvedAt: new Date().toISOString() } : c)),
-    );
+    try {
+      await impl(id);
+      if (!aliveRef.current) return;
+      setComments((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, resolvedAt: new Date().toISOString() } : c)),
+      );
+    } catch (e) {
+      if (aliveRef.current) {
+        setError(e instanceof Error ? e : new Error(String(e)));
+      }
+      throw e;
+    }
   }, []);
 
   const unresolveCb = useCallback(async (id: string) => {
     const impl = adaptersRef.current.unresolve;
     if (!impl) return;
-    await impl(id);
-    setComments((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, resolvedAt: null } : c)),
-    );
+    try {
+      await impl(id);
+      if (!aliveRef.current) return;
+      setComments((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, resolvedAt: null } : c)),
+      );
+    } catch (e) {
+      if (aliveRef.current) {
+        setError(e instanceof Error ? e : new Error(String(e)));
+      }
+      throw e;
+    }
   }, []);
 
   const removeCb = useCallback(async (id: string) => {
     const impl = adaptersRef.current.remove;
     if (!impl) return;
-    await impl(id);
-    setComments((prev) => prev.filter((c) => c.id !== id && c.parentCommentId !== id));
+    try {
+      await impl(id);
+      if (!aliveRef.current) return;
+      setComments((prev) => prev.filter((c) => c.id !== id && c.parentCommentId !== id));
+    } catch (e) {
+      if (aliveRef.current) {
+        setError(e instanceof Error ? e : new Error(String(e)));
+      }
+      throw e;
+    }
   }, []);
 
   return {

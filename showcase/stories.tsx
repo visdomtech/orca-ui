@@ -1822,7 +1822,6 @@ export function CommentThreadStory() {
       <Variant label="Populated — one open thread + one resolved">
         <div style={{ width: 640 }}>
           <CommentThread
-            entityRef={{ objectType: "page", objectId: "overview" }}
             comments={comments}
             currentActor={CURRENT_ACTOR}
             onPost={onPost}
@@ -1835,7 +1834,6 @@ export function CommentThreadStory() {
       <Variant label="Empty state">
         <div style={{ width: 640 }}>
           <CommentThread
-            entityRef={{ objectType: "metric", objectId: "turnover" }}
             comments={[]}
             currentActor={CURRENT_ACTOR}
             onPost={async () => undefined}
@@ -1846,7 +1844,6 @@ export function CommentThreadStory() {
       <Variant label="Read-only (no composer, no actions)">
         <div style={{ width: 640 }}>
           <CommentThread
-            entityRef={{ objectType: "insight", objectId: "ins-01" }}
             comments={COMMENT_SEED.slice(0, 2)}
             currentActor={CURRENT_ACTOR}
             onPost={async () => undefined}

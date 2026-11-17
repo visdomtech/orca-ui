@@ -180,7 +180,6 @@ export type {
   CommentThreadProps,
   Comment,
   CommentThreadDraft,
-  EntityRef,
   UseCommentThreadOptions,
   UseCommentThreadResult,
 } from "./CommentThread";
