@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/visdomtech/orca-ui/compare/v1.4.0...v1.4.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* add cost center to user access ([#26](https://github.com/visdomtech/orca-ui/issues/26)) ([b804bf5](https://github.com/visdomtech/orca-ui/commit/b804bf5388371f37168ee3e6be2288e5be6aea5f))
+
 ## [1.4.0](https://github.com/visdomtech/orca-ui/compare/v1.3.0...v1.4.0) (2026-11-17)
 
 
