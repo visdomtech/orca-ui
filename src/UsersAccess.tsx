@@ -104,15 +104,26 @@ const keys = {
 
 // ── API shapes ────────────────────────────────────────────────────────────────
 
-interface UserAppRole {
+/**
+ * One row in the backend's `workspace_app_user_role` table — a single
+ * (user, role, department, cost-center) GRANT, not a user. A user with
+ * multiple grants shows up as multiple rows.
+ *
+ * Empty string on `departmentCode`/`costCenterCode` is the legacy wildcard
+ * sentinel (any dept / any cost center); see `WILDCARD_SCOPE` below.
+ */
+interface UserAppRoleGrantRow {
   userEmail: string;
   roleCode: string;
-  /** Required: scopes the grant to a department. Empty means legacy wildcard. */
   departmentCode?: string;
-  /** Optional: narrows the department grant to one specific cost center. */
   costCenterCode?: string;
   updatedAt: string;
 }
+
+// Legacy wildcard scope sentinel: an empty-string departmentCode or
+// costCenterCode means "any". Used when migrating pre-cost-center rows and
+// when AuditPane applies a role without a specific scope.
+const WILDCARD_SCOPE = "";
 interface AppCustomRole { code: string; label: string }
 interface CapabilityRole { capabilityCode: string; roleCode: string }
 interface HrRole { code: string; label: string }
@@ -154,31 +165,10 @@ interface AuditListResult { entries: AuditLogEntry[]; nextCursor: number }
 
 function useUserRoles() {
   const { appId, httpClient } = useCtx();
-  return useQuery<UserAppRole[]>({
+  return useQuery<UserAppRoleGrantRow[]>({
     queryKey: keys.userRoles(appId),
     queryFn: () => httpClient.get(`/orcaagents/approles/apps/${appId}/user-roles`),
     enabled: !!appId,
-  });
-}
-
-function useSetUserRole() {
-  const { appId, httpClient } = useCtx();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      email,
-      roleCode,
-      costCenterCode,
-    }: {
-      email: string;
-      roleCode: string;
-      costCenterCode?: string;
-    }) =>
-      httpClient.put(
-        `/orcaagents/approles/apps/${appId}/user-roles/${encodeURIComponent(email)}`,
-        { roleCode, costCenterCode }
-      ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.userRoles(appId) }),
   });
 }
 
@@ -199,16 +189,6 @@ function useReplaceUserGrants() {
         `/orcaagents/approles/apps/${appId}/user-roles/${encodeURIComponent(email)}`,
         { grants }
       ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.userRoles(appId) }),
-  });
-}
-
-function useRemoveUserRole() {
-  const { appId, httpClient } = useCtx();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (email: string) =>
-      httpClient.delete(`/orcaagents/approles/apps/${appId}/user-roles/${encodeURIComponent(email)}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.userRoles(appId) }),
   });
 }
@@ -237,10 +217,15 @@ function useDeleteCustomRole() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (code: string) =>
-      httpClient.delete(`/orcaagents/approles/apps/${appId}/custom-roles/${code}`),
+      httpClient.delete(`/orcaagents/approles/apps/${appId}/custom-roles/${encodeURIComponent(code)}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.customRoles(appId) }),
   });
 }
+
+// Custom role codes must be strict identifiers: uppercase letters, digits,
+// and underscores only. This matches the server-side normalisation and
+// prevents URL-path traversal via characters like / . % ? #.
+const CUSTOM_ROLE_CODE_RE = /^[A-Z0-9_]{1,64}$/;
 
 function useCapabilityRoles() {
   const { appId, httpClient } = useCtx();
@@ -257,7 +242,7 @@ function useGrantCapabilityRole(onChanged?: () => void) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ capabilityCode, roleCode }: { capabilityCode: string; roleCode: string }) =>
-      httpClient.put(`/orcaagents/approles/apps/${appId}/capability-roles/${capabilityCode}/${roleCode}`, {}),
+      httpClient.put(`/orcaagents/approles/apps/${appId}/capability-roles/${encodeURIComponent(capabilityCode)}/${encodeURIComponent(roleCode)}`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.capabilityRoles(appId) });
       onChanged?.();
@@ -270,7 +255,7 @@ function useRevokeCapabilityRole(onChanged?: () => void) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ capabilityCode, roleCode }: { capabilityCode: string; roleCode: string }) =>
-      httpClient.delete(`/orcaagents/approles/apps/${appId}/capability-roles/${capabilityCode}/${roleCode}`),
+      httpClient.delete(`/orcaagents/approles/apps/${appId}/capability-roles/${encodeURIComponent(capabilityCode)}/${encodeURIComponent(roleCode)}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: keys.capabilityRoles(appId) });
       onChanged?.();
@@ -305,15 +290,35 @@ async function fetchAllEmployees(httpClient: HttpClient): Promise<{ items: Emplo
     "/orcaagents/headcount/employees?page=1&pageSize=100"
   );
   if (!first?.items) return { items: [], truncated: false };
-  const all = [...first.items];
   // Cap at 50 pages (5,000 employees) to bound latency and memory usage.
   const totalPages = Math.min(Math.ceil(first.totalCount / 100), 50);
   const truncated = first.totalCount > 5000;
-  if (totalPages <= 1) return { items: all, truncated };
-  for (let p = 2; p <= totalPages; p++) {
-    const page = await httpClient.get<EmployeeListResult>(
-      `/orcaagents/headcount/employees?page=${p}&pageSize=100`
-    );
+  if (totalPages <= 1) return { items: [...first.items], truncated };
+  // Fire the remaining pages concurrently (with a small cap) instead of
+  // serially — at 5,000 employees a serial loop was 50 sequential round-trips.
+  const concurrency = 5;
+  const remaining = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+  const results = new Array<EmployeeListResult | undefined>(remaining.length);
+  let cursor = 0;
+  async function worker() {
+    while (cursor < remaining.length) {
+      const idx = cursor++;
+      const p = remaining[idx];
+      try {
+        results[idx] = await httpClient.get<EmployeeListResult>(
+          `/orcaagents/headcount/employees?page=${p}&pageSize=100`
+        );
+      } catch {
+        // One bad page shouldn't lose the whole roster.
+        results[idx] = undefined;
+      }
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, remaining.length) }, () => worker())
+  );
+  const all = [...first.items];
+  for (const page of results) {
     if (page?.items) all.push(...page.items);
   }
   return { items: all, truncated };
@@ -563,7 +568,7 @@ export function UsersAccess({
 // Admins only. Backend already enforces this on write; the gate just avoids
 // showing a non-admin a UI they can't use (and the resulting 403 errors).
 function AdminGate({ children }: { children: ReactNode }) {
-  const { data: info, isLoading, isError } = useUserInfo();
+  const { data: info, isLoading, isError, refetch, isFetching } = useUserInfo();
   const panel: CSSProperties = {
     borderRadius: 10,
     border: `1px solid ${LIGHT_SURFACE.line}`,
@@ -578,7 +583,23 @@ function AdminGate({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (isError || !info?.isAdmin) {
+  if (isError) {
+    return (
+      <div style={panel}>
+        <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: LIGHT_SURFACE.ink }}>
+          Couldn&apos;t verify admin access
+        </p>
+        <p style={{ margin: "4px 0 12px", fontSize: 12, color: LIGHT_SURFACE.ink2 }}>
+          We couldn&apos;t check your access level — this is usually a transient
+          network issue. Try again.
+        </p>
+        <UIButton variant="secondary" size="sm" onClick={() => refetch()} loading={isFetching}>
+          {isFetching ? "Checking…" : "Retry"}
+        </UIButton>
+      </div>
+    );
+  }
+  if (!info?.isAdmin) {
     return (
       <div style={panel}>
         <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: LIGHT_SURFACE.ink }}>
@@ -622,20 +643,10 @@ function UsersAccessInner({
     }
     return m;
   }, [allWorkspaceEmployees]);
-  const linkedEmails = useMemo(
-    () =>
-      new Set(
-        workspaceUsers
-          .map((u) => u.userAccount?.email?.toLowerCase())
-          .filter((e): e is string => !!e)
-      ),
-    [workspaceUsers]
-  );
-
   const mergedAssignments = useMemo(() => {
     // Multi-grant: users can have N rows (one per (role, cost_center)).
     // Group them so the chip-rendering code can show every grant.
-    const assignmentsByEmail = new Map<string, UserAppRole[]>();
+    const assignmentsByEmail = new Map<string, UserAppRoleGrantRow[]>();
     for (const a of assignments) {
       const key = a.userEmail.toLowerCase();
       const list = assignmentsByEmail.get(key);
@@ -645,7 +656,7 @@ function UsersAccessInner({
         assignmentsByEmail.set(key, [a]);
       }
     }
-    const result: UserAppRole[] = [];
+    const result: UserAppRoleGrantRow[] = [];
     for (const wsUser of workspaceUsers) {
       const email = wsUser.userAccount?.email;
       if (!email) continue;
@@ -665,16 +676,6 @@ function UsersAccessInner({
     }
     return result;
   }, [assignments, workspaceUsers, employeeByEmail]);
-
-  // Expose "ghost" assignments (role rows for emails no longer in the
-  // workspace user list) so admins can clean them up via a dedicated section
-  // later if needed. For now we just count them for logging/debugging.
-  const ghostAssignments = useMemo(
-    () => assignments.filter((a) => !linkedEmails.has(a.userEmail.toLowerCase())),
-    [assignments, linkedEmails]
-  );
-  // Reference to keep the computation live (avoid unused-var lint).
-  void ghostAssignments;
 
   const [auditResult, setAuditResult] = useState<RoleAuditResult | undefined>();
   const auditAbortRef = useRef<AbortController | null>(null);
@@ -914,21 +915,15 @@ function UsersPane({
   isError,
 }: {
   roles: { code: string; label: string }[];
-  assignments: UserAppRole[];
+  assignments: UserAppRoleGrantRow[];
   isError: boolean;
 }) {
   const { currentUserEmail } = useCtx();
-  const setRole = useSetUserRole();
-  const removeRole = useRemoveUserRole();
   const replaceGrants = useReplaceUserGrants();
   const { data: hrRoles = [] } = useHrRoles();
   const { data: customRoles = [] } = useCustomRoles();
   const { data: allEmployeesRaw, isLoading: empLoading } = useAllEmployees();
   const allEmployees = useMemo<Employee[]>(() => allEmployeesRaw?.items ?? [], [allEmployeesRaw]);
-  // Suppress unused warnings for legacy single-grant hooks — kept available
-  // in case other panes still reference them, but the main pane uses
-  // replaceGrants for all writes now.
-  void setRole; void removeRole;
 
   const [query, setQuery] = useState("");
   const [filterRole, setFilterRole] = useState("");
@@ -944,6 +939,9 @@ function UsersPane({
   // Which user's grants panel is open. Email identifies the row; null closes.
   const [managingEmail, setManagingEmail] = useState<string | null>(null);
   const [bulkPending, setBulkPending] = useState(false);
+  // Which orphan user is pending purge via the trash button. The button
+  // sets this; the modal does the actual mutate when confirmed.
+  const [purgingEmail, setPurgingEmail] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | undefined>();
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -975,7 +973,7 @@ function UsersPane({
   // Group flat (user, role, cost center) rows into one entry per user with a
   // list of their grants. "No Access" users (no real role) still show up but
   // with an empty grants list, so admins can assign something.
-  interface UserRow { userEmail: string; grants: UserAppRole[] }
+  interface UserRow { userEmail: string; grants: UserAppRoleGrantRow[] }
   const orderedUsers = useMemo<UserRow[]>(() => {
     const byEmail = new Map<string, UserRow>();
     const order: string[] = [];
@@ -1046,7 +1044,11 @@ function UsersPane({
   // that ReBAC can resolve back to employees.
   const parseDept = (code: string): string => {
     const parts = code.split(" - ");
-    return parts.length >= 2 ? parts[1].trim() : code;
+    const name = (parts.length >= 2 ? parts[1] : code).trim();
+    // Any malformed/empty department degenerates to a sentinel so the dropdown
+    // filter and the grouping below drop these rows instead of collecting them
+    // under an invisible "" bucket.
+    return name || "";
   };
 
   const allDeptCodes = useMemo(
@@ -1061,6 +1063,10 @@ function UsersPane({
     const m = new Map<string, string[]>();
     for (const full of allDeptCodes) {
       const dept = parseDept(full);
+      // Guard: an empty parsed department name becomes an invisible dropdown
+      // entry, so skip it. The original full code is still available on the
+      // grant row itself.
+      if (!dept) continue;
       const list = m.get(dept);
       if (list) list.push(full); else m.set(dept, [full]);
     }
@@ -1132,29 +1138,40 @@ function UsersPane({
   // grants (equivalent to the old "No Access"). Adding a specific role in bulk
   // requires cost-center selection per user which is out of scope — admins
   // add roles one-user-at-a-time via the per-row Add popover.
-  function applyBulkClear() {
+  //
+  // Writes fan out with a small concurrency cap so a 500-user bulk clear
+  // doesn't flood the backend with simultaneous PUTs.
+  async function applyBulkClear() {
     const snapshot = [...validSelected];
     if (snapshot.length === 0) { setConfirming(false); return; }
     setBulkPending(true);
-    const results: ("ok" | "error")[] = [];
-    const failures: { email: string; err: unknown }[] = [];
-    for (const email of snapshot) {
-      replaceGrants.mutate({ email, grants: [] }, {
-        onSuccess: () => { results.push("ok"); },
-        onError: (err) => { failures.push({ email, err }); results.push("error"); },
-        onSettled: () => {
-          if (results.length === snapshot.length && mountedRef.current) {
-            setBulkPending(false);
-            setConfirming(false);
-            if (failures.length === 0) {
-              setNotice(`${snapshot.length} ${snapshot.length === 1 ? "person" : "people"} cleared.`);
-              setSelected(new Set());
-            } else {
-              setNotice("Some updates failed. Please try again.");
-            }
-          }
-        },
-      });
+    const concurrency = 5;
+    const failures: string[] = [];
+    let cursor = 0;
+    async function worker() {
+      while (cursor < snapshot.length) {
+        const index = cursor++;
+        const email = snapshot[index];
+        try {
+          await replaceGrants.mutateAsync({ email, grants: [] });
+        } catch {
+          failures.push(email);
+        }
+      }
+    }
+    await Promise.all(
+      Array.from({ length: Math.min(concurrency, snapshot.length) }, () => worker())
+    );
+    if (!mountedRef.current) return;
+    setBulkPending(false);
+    setConfirming(false);
+    if (failures.length === 0) {
+      setNotice(`${snapshot.length} ${snapshot.length === 1 ? "person" : "people"} cleared.`);
+      setSelected(new Set());
+    } else {
+      setNotice(
+        `${snapshot.length - failures.length} of ${snapshot.length} cleared; ${failures.length} failed (${nameList(failures)}).`
+      );
     }
   }
 
@@ -1256,7 +1273,9 @@ function UsersPane({
           </UIButton>
         )}
         <span style={{ marginLeft: "auto", fontSize: 12, color: LIGHT_SURFACE.ink2 }}>
-          {filtersOn ? `${filtered.length} of ${assignments.length} people match` : `${assignments.length} people`}
+          {filtersOn
+            ? `${filtered.length} of ${orderedUsers.length} people match`
+            : `${orderedUsers.length} people`}
         </span>
       </div>
 
@@ -1423,11 +1442,11 @@ function UsersPane({
                   </div>
                 </td>
                 <td style={{ padding: "8px 12px", textAlign: "right" }}>
-                  {!empLoading && !allEmployeeEmails.has(userEmail.toLowerCase()) && (
+                  {!empLoading && !isMe && !allEmployeeEmails.has(userEmail.toLowerCase()) && (
                     <button
                       type="button"
                       title="Remove user"
-                      onClick={() => replaceGrants.mutate({ email: userEmail, grants: [] })}
+                      onClick={() => setPurgingEmail(userEmail)}
                       aria-label={`Remove ${userEmail}`}
                       style={{
                         all: "unset",
@@ -1537,7 +1556,48 @@ function UsersPane({
         </ul>
       </UIModal>
 
+      <UIModal
+        open={purgingEmail !== null}
+        onClose={() => { if (!replaceGrants.isPending) setPurgingEmail(null); }}
+        title="Remove user"
+        footer={
+          <Space>
+            <UIButton variant="secondary" onClick={() => setPurgingEmail(null)} disabled={replaceGrants.isPending}>Cancel</UIButton>
+            <UIButton
+              variant="danger"
+              onClick={() => {
+                if (!purgingEmail) return;
+                replaceGrants.mutate(
+                  { email: purgingEmail, grants: [] },
+                  {
+                    onSuccess: () => {
+                      setNotice(`Removed ${purgingEmail}.`);
+                      setPurgingEmail(null);
+                    },
+                    onError: () => setNotice("Failed to remove user — please try again."),
+                  }
+                );
+              }}
+              disabled={replaceGrants.isPending}
+              loading={replaceGrants.isPending}
+            >
+              {replaceGrants.isPending ? "Removing…" : "Remove"}
+            </UIButton>
+          </Space>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 14, color: LIGHT_SURFACE.ink }}>
+          Clear every role grant for{" "}
+          <span style={{ fontWeight: 600 }}>{purgingEmail}</span>? This user is
+          no longer in the employee roster, so their grants cannot be managed
+          through the normal flow.
+        </p>
+      </UIModal>
+
       <ManageGrantsModal
+        // Keyed by target email so switching users or reopening after close
+        // remounts the modal subtree and resets the add-grant form state.
+        key={managingEmail ?? "closed"}
         open={managingEmail !== null}
         onClose={() => setManagingEmail(null)}
         userEmail={managingEmail ?? ""}
@@ -1557,12 +1617,14 @@ function UsersPane({
         departmentOptions={departmentOptions}
         costCentersByDept={costCentersByDept}
         pending={replaceGrants.isPending}
-        onReplace={(next) => {
+        onReplace={async (next) => {
           if (!managingEmail) return;
-          replaceGrants.mutate(
-            { email: managingEmail, grants: next },
-            { onError: () => setNotice("Failed to update grants — please try again.") }
-          );
+          try {
+            await replaceGrants.mutateAsync({ email: managingEmail, grants: next });
+          } catch (err) {
+            setNotice("Failed to update grants — please try again.");
+            throw err;
+          }
         }}
       />
     </div>
@@ -1578,7 +1640,7 @@ function GrantsSummary({
   grants,
   allRoles,
 }: {
-  grants: UserAppRole[];
+  grants: UserAppRoleGrantRow[];
   allRoles: { code: string; label: string }[];
 }) {
   const roleLabel = (code: string) =>
@@ -1643,12 +1705,12 @@ function ManageGrantsModal({
   onClose: () => void;
   userEmail: string;
   userLabel: string;
-  grants: UserAppRole[];
+  grants: UserAppRoleGrantRow[];
   allRoles: { code: string; label: string }[];
   departmentOptions: string[];
   costCentersByDept: Map<string, string[]>;
   pending: boolean;
-  onReplace: (next: UserAppRoleGrant[]) => void;
+  onReplace: (next: UserAppRoleGrant[]) => Promise<void>;
 }) {
   const [newRole, setNewRole] = useState("");
   const [newDept, setNewDept] = useState("");
@@ -1656,14 +1718,15 @@ function ManageGrantsModal({
   const roleLabel = (code: string) =>
     allRoles.find((r) => r.code === code)?.label ?? code;
 
-  // Form is reset by remounting the modal content via `destroyOnHidden` on
-  // the underlying antd Modal (ui-primitive default) — no effect needed.
+  // Form state resets because the parent keys this component by the target
+  // email (`key={managingEmail}`), so React remounts the whole modal on
+  // open/close and on target change — no useEffect needed.
 
-  const toGrants = (list: UserAppRole[]): UserAppRoleGrant[] =>
+  const toGrants = (list: UserAppRoleGrantRow[]): UserAppRoleGrant[] =>
     list.map((g) => ({
       roleCode: g.roleCode,
-      departmentCode: g.departmentCode ?? "",
-      costCenterCode: g.costCenterCode ?? "",
+      departmentCode: g.departmentCode ?? WILDCARD_SCOPE,
+      costCenterCode: g.costCenterCode ?? WILDCARD_SCOPE,
     }));
 
   const availableCCs = costCentersByDept.get(newDept) ?? [];
@@ -1676,7 +1739,7 @@ function ManageGrantsModal({
       return next;
     });
 
-  const removeGrant = (role: string, dept: string, cc: string) => {
+  const removeGrant = (role: string, dept: string, cc: string): Promise<void> => {
     const next = grants
       .filter(
         (g) =>
@@ -1686,10 +1749,10 @@ function ManageGrantsModal({
             (g.costCenterCode ?? "") === cc
           )
       );
-    onReplace(toGrants(next));
+    return onReplace(toGrants(next));
   };
 
-  const addGrant = () => {
+  const addGrant = async () => {
     if (!newRole || !newDept) return;
     // Admin must pick at least one cost center. Nothing picked = no role.
     if (newCostCenters.size === 0) return;
@@ -1710,11 +1773,18 @@ function ManageGrantsModal({
         seen.add(dedupeKey(a));
       }
     }
-    onReplace(next);
-    setNewRole("");
-    setNewDept("");
-    setNewCostCenters(new Set());
+    try {
+      await onReplace(next);
+      // Only reset the form once the save actually succeeded, so a backend
+      // failure leaves the admin's picks intact for retry.
+      setNewRole("");
+      setNewDept("");
+      setNewCostCenters(new Set());
+    } catch {
+      // Parent surfaces the error; leave form state alone so the admin can retry.
+    }
   };
+
 
   // Group grants by (role, dept) so the current-grants list is scannable. Each
   // group shows its CCs as sub-rows with individual × controls.
@@ -1998,7 +2068,7 @@ function MatrixPane({
 }: {
   capabilities: AppCapability[];
   roles: { code: string; label: string }[];
-  assignments: UserAppRole[];
+  assignments: UserAppRoleGrantRow[];
   onCapabilityRolesChanged?: () => void;
 }) {
   const { data: dbPairs = [], isLoading } = useCapabilityRoles();
@@ -2013,6 +2083,7 @@ function MatrixPane({
   const [confirmDeleteRole, setConfirmDeleteRole] = useState<string | undefined>();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | undefined>();
   const [localOverrides, setLocalOverrides] = useState<Record<string, Set<string>>>({});
   const [addingRole, setAddingRole] = useState(false);
   const [newRoleLabel, setNewRoleLabel] = useState("");
@@ -2024,10 +2095,18 @@ function MatrixPane({
   const grantingRoles = [...hrRolesForMatrix, ...staticGrantingRoles, ...customRoles];
   const isMutating = grant.isPending || revoke.isPending || reset.isPending || createCustomRole.isPending || deleteCustomRole.isPending || saving;
   const isCustomized = dbPairs.length > 0;
-  const newRoleCode = newRoleLabel.trim().toUpperCase().replace(/\s+/g, "_");
+  const newRoleCode = newRoleLabel
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_")
+    // Strip anything that isn't an identifier character so the resulting
+    // code can safely be used as a URL path segment and matches the
+    // server-side identifier shape.
+    .replace(/[^A-Z0-9_]/g, "");
+  const newRoleCodeValid = CUSTOM_ROLE_CODE_RE.test(newRoleCode);
 
   function handleCreateRole() {
-    if (!newRoleCode) return;
+    if (!newRoleCodeValid) return;
     createCustomRole.mutate({ code: newRoleCode, label: newRoleLabel.trim() }, {
       onSuccess: () => { setNewRoleLabel(""); setAddingRole(false); },
     });
@@ -2051,6 +2130,7 @@ function MatrixPane({
   }
 
   function handleDone() {
+    setSaveError(undefined);
     const overrideEntries = Object.entries(localOverrides);
     if (overrideEntries.length === 0) { setEditing(false); return; }
     const grants: { capabilityCode: string; roleCode: string }[] = [];
@@ -2071,7 +2151,19 @@ function MatrixPane({
     Promise.allSettled([
       ...grants.map(g => grant.mutateAsync(g)),
       ...revokes.map(r => revoke.mutateAsync(r)),
-    ]).then(() => { setSaving(false); setLocalOverrides({}); setEditing(false); });
+    ]).then((results) => {
+      setSaving(false);
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed > 0) {
+        // Leave edit mode and localOverrides intact so the admin can retry.
+        setSaveError(
+          `${failed} of ${results.length} capability change${results.length === 1 ? "" : "s"} failed. Please try again.`
+        );
+        return;
+      }
+      setLocalOverrides({});
+      setEditing(false);
+    });
   }
 
   const closeConfirmReset = useCallback(() => { if (!reset.isPending) setConfirmReset(false); }, [reset.isPending]);
@@ -2100,6 +2192,20 @@ function MatrixPane({
         }
       />
 
+      {saveError && (
+        <div style={{
+          marginBottom: 12,
+          borderRadius: 10,
+          background: LIGHT_TONES.danger.tint,
+          color: LIGHT_TONES.danger.fg,
+          padding: "8px 12px",
+          fontSize: 14,
+          boxShadow: `inset 0 0 0 1px ${LIGHT_TONES.danger.dot}33`,
+        }}>
+          {saveError}
+        </div>
+      )}
+
       {isLoading ? (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 0" }}>
           <span
@@ -2119,7 +2225,13 @@ function MatrixPane({
         <BasicTable headers={[
           "Capability",
           ...grantingRoles.map((role) => {
-            const count = assignments.filter((a) => a.roleCode === role.code).length;
+            // Dedupe by email so a user holding this role across multiple
+            // cost centers counts once (assignments is grant-row granularity).
+            const count = new Set(
+              assignments
+                .filter((a) => a.roleCode === role.code)
+                .map((a) => a.userEmail.toLowerCase())
+            ).size;
             const isCustom = customRoleCodes.has(role.code);
             return (
               <span key={role.code} style={{ margin: "0 auto", display: "block", width: 92, textAlign: "center" }}>
@@ -2180,13 +2292,13 @@ function MatrixPane({
               <button
                 type="button"
                 onClick={handleCreateRole}
-                disabled={!newRoleCode || createCustomRole.isPending}
+                disabled={!newRoleCodeValid || createCustomRole.isPending}
                 aria-label="Confirm new role"
                 style={{
                   all: "unset",
                   cursor: "pointer",
                   color: LIGHT_SURFACE.brand,
-                  opacity: !newRoleCode || createCustomRole.isPending ? 0.4 : 1,
+                  opacity: !newRoleCodeValid || createCustomRole.isPending ? 0.4 : 1,
                 }}
               >✓</button>
               <button
@@ -2283,8 +2395,14 @@ function MatrixPane({
 
       {(() => {
         const roleToDelete = confirmDeleteRole ? grantingRoles.find((r) => r.code === confirmDeleteRole) : undefined;
+        // Dedupe by email: assignments is grant rows, not users, so a user
+        // holding this role in multiple cost centers must count once.
         const usersWithRole = confirmDeleteRole
-          ? assignments.filter((a) => a.roleCode === confirmDeleteRole).length
+          ? new Set(
+              assignments
+                .filter((a) => a.roleCode === confirmDeleteRole)
+                .map((a) => a.userEmail.toLowerCase())
+            ).size
           : 0;
         return (
           <UIModal
@@ -2489,7 +2607,16 @@ function StepHeading({ n, title, aside }: { n: number; title: string; aside?: st
 }
 
 function exportAuditToCsv(result: RoleAuditResult): void {
-  const cell = (s: string) => `"${s.replace(/"/g, '""')}"`;
+  // Guard against CSV formula injection: Excel/Sheets will execute any cell
+  // starting with =, +, -, @, tab, or CR as a formula. Prefix any such cell
+  // with a single quote inside the quoted value so the spreadsheet treats
+  // it as plain text.
+  const cell = (s: string) => {
+    const escaped = s.replace(/"/g, '""');
+    const first = escaped.charAt(0);
+    const needsPrefix = first === "=" || first === "+" || first === "-" || first === "@" || first === "\t" || first === "\r";
+    return `"${needsPrefix ? "'" : ""}${escaped}"`;
+  };
   const headers = ["Name", "Current Role", "Concern", "Suggested Role", "Rationale"];
   const dataRows = result.findings.map((f) =>
     [f.employeeName, f.currentRole, CONCERN_CHIP_LABEL[f.concern], f.suggestedRole ?? "", f.rationale].map(cell).join(",")
@@ -2529,14 +2656,26 @@ function AuditPane({
   isLoadingEmployees: boolean;
   auditSubjectCount: number | undefined;
 }) {
-  const setRole = useSetUserRole();
+  const { currentUserEmail } = useCtx();
+  // Audit "Apply suggestion" routes through the multi-grant replace path so
+  // every write in this component goes through the same contract. The
+  // audit finding has no department/cost-center scope, so we send a single
+  // wildcard grant (empty dept + CC) — this preserves the pre-multi-grant
+  // behavior of replacing the user's access with the suggested role.
+  const replaceGrants = useReplaceUserGrants();
+  const [applyError, setApplyError] = useState<string | undefined>();
   const [criteria, setCriteria] = useState<AuditCriteria>(DEFAULT_AUDIT_CRITERIA);
   const [applyConfirm, setApplyConfirm] = useState<RoleAuditFinding | undefined>();
   const [ignoredKeys, setIgnoredKeys] = useState<Set<string>>(() => new Set());
 
   const runDisabled = isPending || isLoadingEmployees || subjects.length === 0;
-  const pendingApply = setRole.isPending;
-  const closeApplyConfirm = useCallback(() => { if (!pendingApply) setApplyConfirm(undefined); }, [pendingApply]);
+  const pendingApply = replaceGrants.isPending;
+  const closeApplyConfirm = useCallback(() => {
+    if (!pendingApply) {
+      setApplyConfirm(undefined);
+      setApplyError(undefined);
+    }
+  }, [pendingApply]);
 
   const selectedCount = AUDIT_CRITERIA_OPTIONS.filter((o) => criteria[o.key]).length;
   const instructions = criteria.customInstructions;
@@ -2927,7 +3066,7 @@ function AuditPane({
                 <Space size={8}>
                   <UIButton variant="secondary" size="sm" onClick={() => setIgnoredKeys((prev) => new Set([...prev, `${f.employeeId}-${f.concern}`]))}>Ignore</UIButton>
                   {f.suggestedRole && (
-                    <UIButton variant="primary" size="sm" onClick={() => setApplyConfirm(f)} disabled={setRole.isPending}>Apply suggestion</UIButton>
+                    <UIButton variant="primary" size="sm" onClick={() => setApplyConfirm(f)} disabled={pendingApply}>Apply suggestion</UIButton>
                   )}
                 </Space>
               </div>
@@ -2942,23 +3081,34 @@ function AuditPane({
         title="Apply role suggestion"
         footer={
           <Space>
-            <UIButton variant="secondary" onClick={() => setApplyConfirm(undefined)} disabled={setRole.isPending}>Cancel</UIButton>
+            <UIButton variant="secondary" onClick={() => { setApplyConfirm(undefined); setApplyError(undefined); }} disabled={pendingApply}>Cancel</UIButton>
             <UIButton
               variant="primary"
               onClick={() => {
                 const f = applyConfirm;
                 if (!f) return;
-                setRole.mutate({ email: f.employeeId, roleCode: f.suggestedRole! }, {
-                  onSuccess: () => {
-                    onResult({ ...result, findings: result.findings.filter((x) => !(x.employeeId === f.employeeId && x.concern === f.concern)) });
-                    setApplyConfirm(undefined);
-                  },
-                });
+                setApplyError(undefined);
+                const grants: UserAppRoleGrant[] =
+                  f.suggestedRole === "NONE" || !f.suggestedRole
+                    ? []
+                    : [{ roleCode: f.suggestedRole, departmentCode: WILDCARD_SCOPE, costCenterCode: WILDCARD_SCOPE }];
+                replaceGrants.mutate(
+                  { email: f.employeeId, grants },
+                  {
+                    onSuccess: () => {
+                      onResult({ ...result, findings: result.findings.filter((x) => !(x.employeeId === f.employeeId && x.concern === f.concern)) });
+                      setApplyConfirm(undefined);
+                    },
+                    onError: (err) => {
+                      setApplyError(err instanceof Error ? err.message : "Failed to apply suggestion — please try again.");
+                    },
+                  }
+                );
               }}
-              disabled={setRole.isPending}
-              loading={setRole.isPending}
+              disabled={pendingApply || (applyConfirm?.employeeId.toLowerCase() === currentUserEmail.toLowerCase())}
+              loading={pendingApply}
             >
-              {setRole.isPending ? "Applying…" : "Apply"}
+              {pendingApply ? "Applying…" : "Apply"}
             </UIButton>
           </Space>
         }
@@ -2973,6 +3123,16 @@ function AuditPane({
             {applyConfirm.rationale && (
               <p style={{ marginTop: 8, marginBottom: 0, fontSize: 12, color: LIGHT_SURFACE.ink2 }}>
                 {applyConfirm.rationale}
+              </p>
+            )}
+            {applyConfirm.employeeId.toLowerCase() === currentUserEmail.toLowerCase() && (
+              <p style={{ marginTop: 8, marginBottom: 0, fontSize: 12, color: LIGHT_TONES.warning.fg }}>
+                You can&apos;t change your own role from this screen.
+              </p>
+            )}
+            {applyError && (
+              <p style={{ marginTop: 8, marginBottom: 0, fontSize: 12, color: LIGHT_TONES.danger.fg }}>
+                {applyError}
               </p>
             )}
             {applyConfirm.suggestedRole === "NONE" && (
