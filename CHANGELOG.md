@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.3](https://github.com/visdomtech/orca-ui/compare/v1.4.2...v1.4.3) (2026-11-25)
+
+
+### Bug Fixes
+
+* add helper fn for audit roles ([#30](https://github.com/visdomtech/orca-ui/issues/30)) ([0fd1cef](https://github.com/visdomtech/orca-ui/commit/0fd1ceffaddb69692c5f26fe98281fd4687bfb2b))
+
 ## [1.4.2](https://github.com/visdomtech/orca-ui/compare/v1.4.1...v1.4.2) (2026-11-25)
 
 
