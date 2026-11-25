@@ -565,6 +565,20 @@ export function UsersAccess({
   );
 }
 
+/**
+ * Legacy capability code that used to unlock Users & Access per app role. The
+ * page is now workspace-admin only, so it is filtered out of the matrix.
+ */
+const MANAGE_USERS_CAPABILITY = "MANAGE_USERS";
+
+const WORKSPACE_ADMIN_ROLES = ["CUSTOMER_ADMIN", "SYSTEM_ADMIN"];
+
+/** Customer or system admin — the same rule the host's useUserInfo applies. */
+function isWorkspaceAdmin(info: UserInfoResponse | undefined): boolean {
+  if (!info) return false;
+  return info.isAdmin === true || (info.roles ?? []).some((r) => WORKSPACE_ADMIN_ROLES.includes(r));
+}
+
 // Admins only. Backend already enforces this on write; the gate just avoids
 // showing a non-admin a UI they can't use (and the resulting 403 errors).
 function AdminGate({ children }: { children: ReactNode }) {
@@ -599,7 +613,7 @@ function AdminGate({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (!info?.isAdmin) {
+  if (!isWorkspaceAdmin(info)) {
     return (
       <div style={panel}>
         <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: LIGHT_SURFACE.ink }}>
@@ -687,36 +701,30 @@ function UsersAccessInner({
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  const managingRoleCodes = useMemo(() => {
-    if (!capabilities) return new Set<string>();
-    const cap = capabilities.find((c) => c.code === "MANAGE_USERS");
-    return new Set(cap?.defaultRoles ?? []);
-  }, [capabilities]);
+  // Users & Access is workspace-admin only, so no app role "can change access" —
+  // drop a legacy MANAGE_USERS capability so it never shows up as a matrix row.
+  const matrixCapabilities = useMemo(
+    () => capabilities?.filter((c) => c.code !== MANAGE_USERS_CAPABILITY),
+    [capabilities]
+  );
 
   // With multi-grant, mergedAssignments is one row per (user, role, cost center)
-  // grant. Summary works at user granularity: unique users with any grant,
-  // distinct roles in use across all grants, and managers (users with a
-  // managing role).
-  const { withAccessUsers, totalUsers, rolesInUse, managerEmails } = useMemo(() => {
+  // grant. Summary works at user granularity: unique users with any grant and
+  // distinct roles in use across all grants.
+  const { withAccessUsers, totalUsers, rolesInUse } = useMemo(() => {
     const allEmails = new Set(mergedAssignments.map((a) => a.userEmail.toLowerCase()));
     const realGrants = mergedAssignments.filter((a) => a.roleCode && a.roleCode !== "NONE");
     const withAccess = new Set(realGrants.map((a) => a.userEmail.toLowerCase()));
-    const managers = new Set(
-      realGrants.filter((a) => managingRoleCodes.has(a.roleCode)).map((a) => a.userEmail)
-    );
     return {
       withAccessUsers: withAccess.size,
       totalUsers: allEmails.size,
       rolesInUse: new Set(realGrants.map((a) => a.roleCode)).size,
-      managerEmails: [...managers],
     };
-  }, [mergedAssignments, managingRoleCodes]);
+  }, [mergedAssignments]);
 
   const summary = `${withAccessUsers} of ${totalUsers} ${
     totalUsers === 1 ? "person has" : "people have"
-  } access, in ${rolesInUse} ${rolesInUse === 1 ? "role" : "roles"}. ${
-    managerEmails.length
-  } can change access${managerEmails.length > 0 ? `: ${nameList(managerEmails)}.` : "."}`;
+  } access, in ${rolesInUse} ${rolesInUse === 1 ? "role" : "roles"}. Only workspace admins can change access.`;
 
   const [auditError, setAuditError] = useState<string | undefined>();
   const [auditPending, setAuditPending] = useState(false);
@@ -814,7 +822,7 @@ function UsersAccessInner({
     (historyUserRoles.data?.entries.length ?? 0) +
     (historyCustomRoles.data?.entries.length ?? 0);
 
-  const showMatrix = capabilities !== undefined && capabilities.length > 0;
+  const showMatrix = matrixCapabilities !== undefined && matrixCapabilities.length > 0;
   const showAudit = auditRoles !== undefined;
   const rosterTruncated = allEmployeesData?.truncated ?? false;
 
@@ -879,7 +887,7 @@ function UsersAccessInner({
             )}
             {shown === "matrix" && showMatrix && (
               <MatrixPane
-                capabilities={capabilities}
+                capabilities={matrixCapabilities}
                 roles={roles}
                 assignments={mergedAssignments}
                 onCapabilityRolesChanged={onCapabilityRolesChanged}
