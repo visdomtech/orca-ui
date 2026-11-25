@@ -170,6 +170,8 @@ export {
   DEFAULT_AUDIT_CRITERIA,
   CONCERN_VALUES,
 } from "./roleAuditPrompt";
+export { createRoleAuditRunner } from "./roleAuditRunner";
+export type { RoleAuditFetch, RoleAuditRunner } from "./roleAuditRunner";
 
 // OrgChart ships via a subpath export (`@doublefin/orca-ui/org-chart`) so
 // consumers who don't need it don't pay for `@xyflow/react` resolution or
