@@ -565,6 +565,14 @@ export function UsersAccess({
   );
 }
 
+const WORKSPACE_ADMIN_ROLES = ["CUSTOMER_ADMIN", "SYSTEM_ADMIN"];
+
+/** Customer or system admin — the same rule the host's useUserInfo applies. */
+function isWorkspaceAdmin(info: UserInfoResponse | undefined): boolean {
+  if (!info) return false;
+  return info.isAdmin === true || (info.roles ?? []).some((r) => WORKSPACE_ADMIN_ROLES.includes(r));
+}
+
 // Admins only. Backend already enforces this on write; the gate just avoids
 // showing a non-admin a UI they can't use (and the resulting 403 errors).
 function AdminGate({ children }: { children: ReactNode }) {
@@ -599,7 +607,7 @@ function AdminGate({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (!info?.isAdmin) {
+  if (!isWorkspaceAdmin(info)) {
     return (
       <div style={panel}>
         <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: LIGHT_SURFACE.ink }}>
@@ -687,36 +695,23 @@ function UsersAccessInner({
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  const managingRoleCodes = useMemo(() => {
-    if (!capabilities) return new Set<string>();
-    const cap = capabilities.find((c) => c.code === "MANAGE_USERS");
-    return new Set(cap?.defaultRoles ?? []);
-  }, [capabilities]);
-
   // With multi-grant, mergedAssignments is one row per (user, role, cost center)
-  // grant. Summary works at user granularity: unique users with any grant,
-  // distinct roles in use across all grants, and managers (users with a
-  // managing role).
-  const { withAccessUsers, totalUsers, rolesInUse, managerEmails } = useMemo(() => {
+  // grant. Summary works at user granularity: unique users with any grant and
+  // distinct roles in use across all grants.
+  const { withAccessUsers, totalUsers, rolesInUse } = useMemo(() => {
     const allEmails = new Set(mergedAssignments.map((a) => a.userEmail.toLowerCase()));
     const realGrants = mergedAssignments.filter((a) => a.roleCode && a.roleCode !== "NONE");
     const withAccess = new Set(realGrants.map((a) => a.userEmail.toLowerCase()));
-    const managers = new Set(
-      realGrants.filter((a) => managingRoleCodes.has(a.roleCode)).map((a) => a.userEmail)
-    );
     return {
       withAccessUsers: withAccess.size,
       totalUsers: allEmails.size,
       rolesInUse: new Set(realGrants.map((a) => a.roleCode)).size,
-      managerEmails: [...managers],
     };
-  }, [mergedAssignments, managingRoleCodes]);
+  }, [mergedAssignments]);
 
   const summary = `${withAccessUsers} of ${totalUsers} ${
     totalUsers === 1 ? "person has" : "people have"
-  } access, in ${rolesInUse} ${rolesInUse === 1 ? "role" : "roles"}. ${
-    managerEmails.length
-  } can change access${managerEmails.length > 0 ? `: ${nameList(managerEmails)}.` : "."}`;
+  } access, in ${rolesInUse} ${rolesInUse === 1 ? "role" : "roles"}. Only workspace admins can change access.`;
 
   const [auditError, setAuditError] = useState<string | undefined>();
   const [auditPending, setAuditPending] = useState(false);
