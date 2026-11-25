@@ -565,12 +565,6 @@ export function UsersAccess({
   );
 }
 
-/**
- * Legacy capability code that used to unlock Users & Access per app role. The
- * page is now workspace-admin only, so it is filtered out of the matrix.
- */
-const MANAGE_USERS_CAPABILITY = "MANAGE_USERS";
-
 const WORKSPACE_ADMIN_ROLES = ["CUSTOMER_ADMIN", "SYSTEM_ADMIN"];
 
 /** Customer or system admin — the same rule the host's useUserInfo applies. */
@@ -701,13 +695,6 @@ function UsersAccessInner({
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  // Users & Access is workspace-admin only, so no app role "can change access" —
-  // drop a legacy MANAGE_USERS capability so it never shows up as a matrix row.
-  const matrixCapabilities = useMemo(
-    () => capabilities?.filter((c) => c.code !== MANAGE_USERS_CAPABILITY),
-    [capabilities]
-  );
-
   // With multi-grant, mergedAssignments is one row per (user, role, cost center)
   // grant. Summary works at user granularity: unique users with any grant and
   // distinct roles in use across all grants.
@@ -822,7 +809,7 @@ function UsersAccessInner({
     (historyUserRoles.data?.entries.length ?? 0) +
     (historyCustomRoles.data?.entries.length ?? 0);
 
-  const showMatrix = matrixCapabilities !== undefined && matrixCapabilities.length > 0;
+  const showMatrix = capabilities !== undefined && capabilities.length > 0;
   const showAudit = auditRoles !== undefined;
   const rosterTruncated = allEmployeesData?.truncated ?? false;
 
@@ -887,7 +874,7 @@ function UsersAccessInner({
             )}
             {shown === "matrix" && showMatrix && (
               <MatrixPane
-                capabilities={matrixCapabilities}
+                capabilities={capabilities}
                 roles={roles}
                 assignments={mergedAssignments}
                 onCapabilityRolesChanged={onCapabilityRolesChanged}
