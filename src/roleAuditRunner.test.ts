@@ -126,13 +126,37 @@ describe("createRoleAuditRunner", () => {
     await expect(run([], roles, DEFAULT_AUDIT_CRITERIA)).rejects.toThrow(/not registered/);
   });
 
-  it("includes status and a body snippet for other HTTP failures", async () => {
+  it("keeps the raw body of other HTTP failures out of the message, in cause", async () => {
     const run = createRoleAuditRunner(
-      vi.fn().mockResolvedValue(new Response(`upstream timeout ${"x".repeat(500)}`, { status: 502 }))
+      vi.fn().mockResolvedValue(new Response(`<html>upstream timeout ${"x".repeat(500)}`, { status: 502 }))
     );
-    const err = await run([], roles, DEFAULT_AUDIT_CRITERIA).catch((e: Error) => e);
-    expect((err as Error).message).toMatch(/^Audit request failed: HTTP 502 — upstream timeout x+…$/);
-    expect((err as Error).message.length).toBeLessThan(260);
+    const err = (await run([], roles, DEFAULT_AUDIT_CRITERIA).catch((e: Error) => e)) as Error;
+    expect(err.message).toBe("Audit request failed: HTTP 502");
+    expect(err.cause).toMatch(/^<html>upstream timeout x{177}…$/);
+  });
+
+  it("shows only the problem+json title, not the internal detail", async () => {
+    const body = JSON.stringify({
+      title: "Internal Server Error",
+      detail: "rpc error: firestore projects/acme-prod/databases/(default)",
+    });
+    const run = createRoleAuditRunner(vi.fn().mockResolvedValue(new Response(body, { status: 500 })));
+    const err = (await run([], roles, DEFAULT_AUDIT_CRITERIA).catch((e: Error) => e)) as Error;
+    expect(err.message).toBe("Audit request failed: HTTP 500 (Internal Server Error)");
+    expect(err.cause).toContain("firestore");
+  });
+
+  it("keeps the AbortError when aborted while reading an error body", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const response = {
+      ok: false,
+      status: 500,
+      text: () => Promise.reject(new DOMException("aborted", "AbortError")),
+    } as unknown as Response;
+    const run = createRoleAuditRunner(vi.fn().mockResolvedValue(response));
+    const err = (await run([], roles, DEFAULT_AUDIT_CRITERIA, controller.signal).catch((e: Error) => e)) as Error;
+    expect(err.name).toBe("AbortError");
   });
 
   it("rejects when the response has no body", async () => {
@@ -143,7 +167,21 @@ describe("createRoleAuditRunner", () => {
   it("surfaces an error event from the agent, truncated", async () => {
     await expect(runWith([frame({ error: "boom" }, "error")])).rejects.toThrow("boom");
     const err = await runWith([frame({ error: "e".repeat(1000) }, "error")]).catch((e: Error) => e);
-    expect((err as Error).message.length).toBeLessThanOrEqual(301);
+    expect((err as Error).message).toMatch(/^e{300}…$/);
+  });
+
+  it.each([
+    ["an agent error event", [frame({ error: "boom" }, "error"), frame({ text: "late" })]],
+    ["a stream without [DONE]", [frame({ text: "x" })]],
+  ])("cancels the reader after %s", async (_name, chunks) => {
+    const { response } = sse(chunks);
+    const reader = response.body!.getReader();
+    const cancel = vi.spyOn(reader, "cancel");
+    const stub = { ok: true, status: 200, body: { getReader: () => reader } } as unknown as Response;
+    await expect(
+      createRoleAuditRunner(vi.fn().mockResolvedValue(stub))(subjects, roles, DEFAULT_AUDIT_CRITERIA)
+    ).rejects.toThrow();
+    expect(cancel).toHaveBeenCalledOnce();
   });
 
   it("falls back to a generic message for a non-JSON error event", async () => {
@@ -172,23 +210,29 @@ describe("createRoleAuditRunner", () => {
     expect(state.cancelled).toBe(true);
   });
 
-  it("propagates an abort mid-stream as AbortError", async () => {
-    const controller = new AbortController();
-    const body = new ReadableStream<Uint8Array>({
-      start(c) {
-        c.enqueue(new TextEncoder().encode(frame({ partial: true, text: "…" })));
-        controller.signal.addEventListener("abort", () =>
-          c.error(new DOMException("The operation was aborted.", "AbortError"))
-        );
-      },
+  it("propagates an abort mid-stream as AbortError even when cancel() fails", async () => {
+    // cancel() rejects; record whether the runner handles that rejection.
+    let cancelHandled = false;
+    const cancel = vi.fn(() => {
+      const p = Promise.reject(new Error("cancel failed"));
+      const originalCatch = p.catch.bind(p);
+      p.catch = ((onRejected) => {
+        cancelHandled = true;
+        return originalCatch(onRejected);
+      }) as typeof p.catch;
+      return p;
     });
-    const run = createRoleAuditRunner(vi.fn().mockResolvedValue(new Response(body)));
-    const pending = run(subjects, roles, DEFAULT_AUDIT_CRITERIA, controller.signal);
-    setTimeout(() => controller.abort(), 0);
-    const err = await pending.catch((e: Error) => e);
-    // Cancelling the errored stream in `finally` rejects; the runner swallows that
-    // and keeps the original AbortError, which UsersAccess maps to its timeout message.
-    expect((err as Error).name).toBe("AbortError");
+    const reader = {
+      read: vi.fn().mockRejectedValue(new DOMException("The operation was aborted.", "AbortError")),
+      cancel,
+    };
+    const response = { ok: true, status: 200, body: { getReader: () => reader } } as unknown as Response;
+    const run = createRoleAuditRunner(vi.fn().mockResolvedValue(response));
+    const err = (await run(subjects, roles, DEFAULT_AUDIT_CRITERIA).catch((e: Error) => e)) as Error;
+    // UsersAccess maps the AbortError to its timeout message.
+    expect(err.name).toBe("AbortError");
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(cancelHandled).toBe(true);
   });
 
   it("defaults to fetch with credentials: include and forwards the signal", async () => {

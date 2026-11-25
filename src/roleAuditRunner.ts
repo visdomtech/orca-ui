@@ -69,6 +69,16 @@ function isFinalAgentOutput(event: unknown): boolean {
   return e.partial !== true && e.author !== "user";
 }
 
+/** The `title` of an RFC 9457 problem+json body (e.g. "Internal Server Error"), if any. */
+function problemTitle(body: string): string | undefined {
+  try {
+    const title = (JSON.parse(body) as Record<string, unknown> | null)?.title;
+    return typeof title === "string" && title.trim() ? truncate(title.trim(), 80) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function agentErrorMessage(parsed: unknown): string {
   const msg =
     parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>).error : undefined;
@@ -90,7 +100,8 @@ function agentErrorMessage(parsed: unknown): string {
  *
  * @param fetchImpl the app's authenticated fetch (e.g. its `orcaFetch`).
  *   Defaults to `fetch` with `credentials: "include"`.
- * @throws on a non-2xx response, an agent `error` event, a stream that ends
+ * @throws on a non-2xx response (the response body, truncated, is the error's
+ *   `cause`), an agent `error` event, a stream that ends
  *   without `[DONE]`, or a verdict that doesn't parse (the raw agent text,
  *   truncated, is the error's `cause`). An abort rejects with the `AbortError`.
  */
@@ -111,11 +122,18 @@ export function createRoleAuditRunner(fetchImpl?: RoleAuditFetch): RoleAuditRunn
     if (!response.ok) {
       if (response.status === 404)
         throw new Error(`The "${AGENT_NAME}" agent is not registered on this backend.`);
-      const body = (await response.text().catch(() => "")).trim();
-      throw new Error(
-        `Audit request failed: HTTP ${response.status}` +
-          (body ? ` — ${truncate(body, ERROR_BODY_MAX)}` : "")
-      );
+      const body = (
+        await response.text().catch((err: unknown) => {
+          if (signal?.aborted) throw err; // keep the AbortError for the timeout message
+          return "";
+        })
+      ).trim();
+      // The body can carry raw backend errors (internal paths, proxy HTML), so it
+      // goes in `cause` for debugging; the UI-facing message keeps only a title.
+      const title = problemTitle(body);
+      throw new Error(`Audit request failed: HTTP ${response.status}${title ? ` (${title})` : ""}`, {
+        cause: body ? truncate(body, ERROR_BODY_MAX) : undefined,
+      });
     }
     if (!response.body) throw new Error("No response body from audit agent.");
 
@@ -144,6 +162,8 @@ export function createRoleAuditRunner(fetchImpl?: RoleAuditFetch): RoleAuditRunn
 
     /** Feeds one SSE line. Returns true once `[DONE]` has been dispatched. */
     const feedLine = (line: string): boolean => {
+      // Trimming is looser than the spec's single optional space after "data:",
+      // which is fine for this backend's one-JSON-object-per-line frames.
       const trimmed = line.trim();
       if (trimmed === "") return dispatch();
       if (trimmed.startsWith("event:")) eventType = trimmed.slice(6).trim();
@@ -164,15 +184,18 @@ export function createRoleAuditRunner(fetchImpl?: RoleAuditFetch): RoleAuditRunn
         // At end of stream the tail is a complete line; flush it and the pending event.
         buffer = done ? "" : (lines.pop() ?? "");
         if (done) lines.push("");
-        if (lines.some(feedLine)) {
-          completed = true;
-          break;
+        for (const line of lines) {
+          if (feedLine(line)) {
+            completed = true;
+            break;
+          }
         }
-        if (done) break;
+        if (completed || done) break;
       }
     } finally {
-      // Release the connection whether we finished, failed, or were aborted.
-      await reader.cancel().catch(() => undefined);
+      // Release the connection whether we finished, failed, or were aborted. Not
+      // awaited: a custom stream whose cancel() never settles mustn't hang the audit.
+      void reader.cancel().catch(() => undefined);
     }
 
     if (!completed) throw new Error("Audit stream ended without a completion signal.");
@@ -189,8 +212,8 @@ export function createRoleAuditRunner(fetchImpl?: RoleAuditFetch): RoleAuditRunn
 
 /**
  * Whether the backend has the `"role-audit"` agent registered
- * (GET `/orcaagents/app/agents`). Resolves `false` on any failure, so it is
- * safe to gate the Audit tab on directly.
+ * (GET `/orcaagents/app/agents`). Resolves `false` on any failure, including
+ * an abort, so it is safe to gate the Audit tab on directly.
  */
 export async function checkRoleAuditAvailable(
   fetchImpl?: RoleAuditFetch,
