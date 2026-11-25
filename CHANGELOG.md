@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/visdomtech/orca-ui/compare/v1.4.1...v1.4.2) (2026-11-25)
+
+
+### Bug Fixes
+
+* remove manage users from access matrix ([#28](https://github.com/visdomtech/orca-ui/issues/28)) ([fda6bea](https://github.com/visdomtech/orca-ui/commit/fda6bea51f742c5ff81fe9a0043efa00db0a75ad))
+
 ## [1.4.1](https://github.com/visdomtech/orca-ui/compare/v1.4.0...v1.4.1) (2026-11-24)
 
 
