@@ -18,6 +18,10 @@
       "types": "./dist/roleAuditPrompt.d.ts",
       "import": "./dist/roleAuditPrompt.js"
     },
+    "./role-audit-runner": {
+      "types": "./dist/roleAuditRunner.d.ts",
+      "import": "./dist/roleAuditRunner.js"
+    },
     "./org-chart": {
       "types": "./dist/OrgChart.d.ts",
       "import": "./dist/OrgChart.js"

@@ -28,6 +28,7 @@ import {
   type RoleAuditFinding,
   type RoleAuditResult,
 } from "./roleAuditPrompt";
+import type { RoleAuditRunner } from "./roleAuditRunner";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -61,13 +62,10 @@ export interface UsersAccessProps {
    * Provide to enable the Audit Roles tab. Receives the roster and criteria,
    * calls the backend AI agent, and resolves with the audit result.
    * Omit to hide the Audit tab.
+   * @see createRoleAuditRunner for the standard implementation, and
+   *   checkRoleAuditAvailable to decide whether to pass it.
    */
-  auditRoles?: (
-    subjects: AuditSubject[],
-    roles: { code: string; label: string }[],
-    criteria: AuditCriteria,
-    signal?: AbortSignal
-  ) => Promise<RoleAuditResult>;
+  auditRoles?: RoleAuditRunner;
   /** Open a specific tab on mount. Defaults to "users". */
   initialPane?: "users" | "matrix" | "history" | "audit";
 }
@@ -693,7 +691,11 @@ function UsersAccessInner({
     auditAbortRef.current?.abort();
   }, []);
   const mountedRef = useRef(true);
-  useEffect(() => () => { mountedRef.current = false; }, []);
+  // Re-arm on mount: StrictMode's dev double-mount runs the cleanup once first.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   // With multi-grant, mergedAssignments is one row per (user, role, cost center)
   // grant. Summary works at user granularity: unique users with any grant and
